@@ -88,7 +88,7 @@ func Package(scriptContent string, scriptDir string) (*Result, error) {
 	// Compute the 1-indexed byte offset of the payload within the final file.
 	// Replace the fixed-width placeholder with the actual offset.
 	payloadOffset := len(scriptText) + 1 // tail -c + is 1-indexed
-	replacement := fmt.Sprintf("%020d", payloadOffset)
+	replacement := fmt.Sprintf("0x%08x", payloadOffset)
 	scriptText = strings.Replace(scriptText, bashgen.OffsetPlaceholder, replacement, 1)
 
 	// Combine script text + binary payload

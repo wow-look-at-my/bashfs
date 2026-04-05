@@ -10,8 +10,8 @@ import (
 )
 
 // OffsetPlaceholder is replaced with the actual byte offset at packaging time.
-// It must be exactly 20 characters so the replacement preserves byte count.
-const OffsetPlaceholder = "00000000000000000000"
+// Fixed-width hex (0x + 8 digits) so the replacement preserves byte count.
+const OffsetPlaceholder = "0x00000000"
 
 // EmbeddedResult holds the generated bash code and the raw binary payload.
 type EmbeddedResult struct {
@@ -54,8 +54,7 @@ func GenerateEmbedded(files []fswalker.FileEntry) (*EmbeddedResult, error) {
 
 	// Payload offset placeholder — replaced at packaging time with the real
 	// 1-indexed byte position of the binary payload within the script file.
-	fmt.Fprintf(&b, "__bashfs_payload_offset=%s\n", OffsetPlaceholder)
-	b.WriteString("__bashfs_payload_offset=$((10#$__bashfs_payload_offset))\n\n")
+	fmt.Fprintf(&b, "__bashfs_payload_offset=%s\n\n", OffsetPlaceholder)
 
 	b.WriteString("declare -A __bashfs_offset=(\n")
 	for _, info := range infos {
