@@ -46,34 +46,34 @@ func TestGenerateEmbedded(t *testing.T) {
 	files, err := fswalker.Walk(dir)
 	require.Nil(t, err)
 
-	output, err := GenerateEmbedded(files)
+	result, err := GenerateEmbedded(files)
 	require.Nil(t, err)
 
-	// Verify associative array declaration
-	assert.Contains(t, output, "declare -A __bashfs_data")
+	// Verify offset array declaration
+	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
 
 	// Verify functions
 	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
-		assert.Contains(t, output, fn)
-
+		assert.Contains(t, result.Script, fn)
 	}
 
 	// Verify file keys are present
-	assert.Contains(t, output, `["hello.txt"]`)
+	assert.Contains(t, result.Script, `["hello.txt"]`)
+	assert.Contains(t, result.Script, `["sub/data.json"]`)
 
-	assert.Contains(t, output, `["sub/data.json"]`)
+	// Verify payload offset placeholder
+	assert.Contains(t, result.Script, OffsetPlaceholder)
 
-	// Verify base64 data is present (should contain = padding or alphanumeric)
-	assert.Contains(t, output, "=")
-
+	// Verify binary payload is non-empty
+	assert.NotEmpty(t, result.Payload)
 }
 
 func TestGenerateEmbeddedEmpty(t *testing.T) {
-	output, err := GenerateEmbedded(nil)
+	result, err := GenerateEmbedded(nil)
 	require.Nil(t, err)
 
-	assert.Contains(t, output, "declare -A __bashfs_data")
-
+	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
+	assert.Empty(t, result.Payload)
 }
 
 func mustWriteFile(t *testing.T, path, content string) {

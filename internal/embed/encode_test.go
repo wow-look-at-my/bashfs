@@ -53,5 +53,19 @@ func TestEncodeBinary(t *testing.T) {
 	var buf bytes.Buffer
 	buf.ReadFrom(r)
 	assert.True(t, bytes.Equal(buf.Bytes(), input))
+}
 
+func TestCompress(t *testing.T) {
+	input := []byte("hello, world!")
+	compressed, err := Compress(input)
+	require.Nil(t, err)
+	require.NotEmpty(t, compressed)
+
+	// Verify round-trip decompression
+	r, err := gzip.NewReader(bytes.NewReader(compressed))
+	require.Nil(t, err)
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(r)
+	require.Nil(t, err)
+	assert.Equal(t, input, buf.Bytes())
 }

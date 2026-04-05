@@ -45,7 +45,7 @@ The output is a single, distributable bash script with no external file dependen
 			return err
 		}
 
-		if err := os.WriteFile(outputFlag, []byte(result), 0755); err != nil {
+		if err := os.WriteFile(outputFlag, result.Data, 0755); err != nil {
 			return fmt.Errorf("writing output %s: %w", outputFlag, err)
 		}
 
