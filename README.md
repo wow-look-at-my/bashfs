@@ -34,7 +34,7 @@ When ready to distribute, package everything into a single self-contained script
 bashfs package myscript.sh -o dist/myscript.sh
 ```
 
-This finds the `eval $(bashfs gen <dir>)` line in your script and replaces it with embedded, gzip-compressed, base64-encoded file data and self-contained helper functions. The output script has no external file dependencies.
+This finds the `eval $(bashfs gen <dir>)` line in your script and replaces it with embedded helper functions and appends gzip-compressed file data as a binary payload after an `exit 0` guard. No base64 encoding means zero encoding overhead. The output script has no external file dependencies.
 
 ## Generated Functions
 
@@ -48,9 +48,10 @@ This finds the `eval $(bashfs gen <dir>)` line in your script and replaces it wi
 ## How It Works
 
 1. Files are recursively collected from the specified directory
-2. Each file is gzip-compressed and base64-encoded
-3. Data is stored in a bash associative array (`declare -A`, requires bash 4+)
-4. Helper functions decode and decompress on the fly using `base64 -d | gzip -d`
+2. Each file is gzip-compressed
+3. An `exit 0` guard is appended to the script, followed by the raw compressed binary payload
+4. File offsets and lengths are stored in a bash associative array (`declare -A`, requires bash 4+)
+5. Helper functions use `tail -c` + `head -c` + `gzip -d` to extract files by byte offset — no base64, zero encoding overhead
 
 ## Example
 
