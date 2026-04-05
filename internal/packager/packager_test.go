@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"github.com/wow-look-at-my/testify/assert"
+	"github.com/wow-look-at-my/testify/require"
 )
 
 func TestPackage(t *testing.T) {
@@ -23,40 +25,29 @@ bashfs_cat greeting.txt
 `
 
 	result, err := Package(script, dir)
-	if err != nil {
-		t.Fatalf("Package() error: %v", err)
-	}
+	require.Nil(t, err)
 
 	// The eval line should be replaced
-	if strings.Contains(result, "eval $(bashfs gen") {
-		t.Error("eval line was not replaced")
-	}
+	assert.NotContains(t, result, "eval $(bashfs gen")
 
 	// Embedded code should be present
-	if !strings.Contains(result, "declare -A __bashfs_data") {
-		t.Error("missing embedded data declaration")
-	}
-	if !strings.Contains(result, "bashfs_cat()") {
-		t.Error("missing bashfs_cat function")
-	}
+	assert.Contains(t, result, "declare -A __bashfs_data")
+
+	assert.Contains(t, result, "bashfs_cat()")
 
 	// Surrounding lines should be preserved
-	if !strings.Contains(result, `echo "before"`) {
-		t.Error("missing line before eval")
-	}
-	if !strings.Contains(result, `echo "after"`) {
-		t.Error("missing line after eval")
-	}
+	assert.Contains(t, result, `echo "before"`)
+
+	assert.Contains(t, result, `echo "after"`)
+
 }
 
 func TestPackageNoEval(t *testing.T) {
 	_, err := Package("#!/bin/bash\necho hello\n", "/tmp")
-	if err == nil {
-		t.Fatal("expected error for missing eval line")
-	}
-	if !strings.Contains(err.Error(), "no 'eval $(bashfs gen ...)' line found") {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NotNil(t, err)
+
+	assert.Contains(t, err.Error(), "no 'eval $(bashfs gen ...)' line found")
+
 }
 
 func TestPackageMultipleEval(t *testing.T) {
@@ -65,12 +56,10 @@ eval $(bashfs gen ./a)
 eval $(bashfs gen ./b)
 `
 	_, err := Package(script, "/tmp")
-	if err == nil {
-		t.Fatal("expected error for multiple eval lines")
-	}
-	if !strings.Contains(err.Error(), "multiple") {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NotNil(t, err)
+
+	assert.Contains(t, err.Error(), "multiple")
+
 }
 
 func TestPackageQuotedPath(t *testing.T) {
@@ -82,12 +71,10 @@ func TestPackageQuotedPath(t *testing.T) {
 eval $(bashfs gen "./myfiles")
 `
 	result, err := Package(script, dir)
-	if err != nil {
-		t.Fatalf("Package() error: %v", err)
-	}
-	if !strings.Contains(result, "declare -A __bashfs_data") {
-		t.Error("missing embedded data for quoted path")
-	}
+	require.Nil(t, err)
+
+	assert.Contains(t, result, "declare -A __bashfs_data")
+
 }
 
 func TestPackagePreservesIndentation(t *testing.T) {
@@ -97,16 +84,13 @@ func TestPackagePreservesIndentation(t *testing.T) {
 
 	script := "#!/bin/bash\n    eval $(bashfs gen ./myfiles)\n"
 	result, err := Package(script, dir)
-	if err != nil {
-		t.Fatalf("Package() error: %v", err)
-	}
+	require.Nil(t, err)
 
 	// Check that indented lines exist
 	for _, line := range strings.Split(result, "\n") {
 		if strings.Contains(line, "declare -A __bashfs_data") {
-			if !strings.HasPrefix(line, "    ") {
-				t.Errorf("embedded code not indented: %q", line)
-			}
+			assert.True(t, strings.HasPrefix(line, "    "))
+
 			break
 		}
 	}
@@ -114,10 +98,8 @@ func TestPackagePreservesIndentation(t *testing.T) {
 
 func mustWriteFile(t *testing.T, path, content string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
+
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+
 }

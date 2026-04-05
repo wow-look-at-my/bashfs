@@ -5,47 +5,38 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"testing"
+	"github.com/wow-look-at-my/testify/assert"
+	"github.com/wow-look-at-my/testify/require"
 )
 
 func TestEncode(t *testing.T) {
 	input := []byte("hello, world!")
 	encoded, err := Encode(input)
-	if err != nil {
-		t.Fatalf("Encode() error: %v", err)
-	}
+	require.Nil(t, err)
 
-	if encoded == "" {
-		t.Fatal("Encode() returned empty string")
-	}
+	require.NotEqual(t, "", encoded)
 
 	// Decode and decompress to verify round-trip
 	compressed, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		t.Fatalf("base64 decode error: %v", err)
-	}
+	require.Nil(t, err)
 
 	r, err := gzip.NewReader(bytes.NewReader(compressed))
-	if err != nil {
-		t.Fatalf("gzip reader error: %v", err)
-	}
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("gzip decompress error: %v", err)
-	}
+	require.Nil(t, err)
 
-	if !bytes.Equal(buf.Bytes(), input) {
-		t.Errorf("round-trip mismatch: got %q, want %q", buf.String(), string(input))
-	}
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(r)
+	require.Nil(t, err)
+
+	assert.True(t, bytes.Equal(buf.Bytes(), input))
+
 }
 
 func TestEncodeEmpty(t *testing.T) {
 	encoded, err := Encode([]byte{})
-	if err != nil {
-		t.Fatalf("Encode() error: %v", err)
-	}
-	if encoded == "" {
-		t.Fatal("Encode() returned empty string for empty input")
-	}
+	require.Nil(t, err)
+
+	require.NotEqual(t, "", encoded)
+
 }
 
 func TestEncodeBinary(t *testing.T) {
@@ -54,16 +45,13 @@ func TestEncodeBinary(t *testing.T) {
 		input[i] = byte(i)
 	}
 	encoded, err := Encode(input)
-	if err != nil {
-		t.Fatalf("Encode() error: %v", err)
-	}
+	require.Nil(t, err)
 
 	// Verify round-trip
 	compressed, _ := base64.StdEncoding.DecodeString(encoded)
 	r, _ := gzip.NewReader(bytes.NewReader(compressed))
 	var buf bytes.Buffer
 	buf.ReadFrom(r)
-	if !bytes.Equal(buf.Bytes(), input) {
-		t.Error("binary round-trip mismatch")
-	}
+	assert.True(t, bytes.Equal(buf.Bytes(), input))
+
 }

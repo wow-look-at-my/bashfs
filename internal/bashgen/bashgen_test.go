@@ -3,10 +3,11 @@ package bashgen
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"bashfs/internal/fswalker"
+	"github.com/wow-look-at-my/testify/assert"
+	"github.com/wow-look-at-my/testify/require"
 )
 
 func TestGenerateDevMode(t *testing.T) {
@@ -15,35 +16,26 @@ func TestGenerateDevMode(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "sub", "data.txt"), "hello")
 
 	files, err := fswalker.Walk(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	output, err := GenerateDevMode(files, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	// Verify key functions are present
 	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
-		if !strings.Contains(output, fn) {
-			t.Errorf("output missing function %s", fn)
-		}
+		assert.Contains(t, output, fn)
+
 	}
 
 	// Verify file paths are listed
-	if !strings.Contains(output, "config.json") {
-		t.Error("output missing config.json")
-	}
-	if !strings.Contains(output, "sub/data.txt") {
-		t.Error("output missing sub/data.txt")
-	}
+	assert.Contains(t, output, "config.json")
+
+	assert.Contains(t, output, "sub/data.txt")
 
 	// Verify absolute path is embedded
 	absDir, _ := filepath.Abs(dir)
-	if !strings.Contains(output, absDir) {
-		t.Errorf("output missing absolute dir %s", absDir)
-	}
+	assert.Contains(t, output, absDir)
+
 }
 
 func TestGenerateEmbedded(t *testing.T) {
@@ -52,57 +44,42 @@ func TestGenerateEmbedded(t *testing.T) {
 	mustWriteFile(t, filepath.Join(dir, "sub", "data.json"), `{"key":"value"}`)
 
 	files, err := fswalker.Walk(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	output, err := GenerateEmbedded(files)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	// Verify associative array declaration
-	if !strings.Contains(output, "declare -A __bashfs_data") {
-		t.Error("output missing declare -A __bashfs_data")
-	}
+	assert.Contains(t, output, "declare -A __bashfs_data")
 
 	// Verify functions
 	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
-		if !strings.Contains(output, fn) {
-			t.Errorf("output missing function %s", fn)
-		}
+		assert.Contains(t, output, fn)
+
 	}
 
 	// Verify file keys are present
-	if !strings.Contains(output, `["hello.txt"]`) {
-		t.Error("output missing hello.txt key")
-	}
-	if !strings.Contains(output, `["sub/data.json"]`) {
-		t.Error("output missing sub/data.json key")
-	}
+	assert.Contains(t, output, `["hello.txt"]`)
+
+	assert.Contains(t, output, `["sub/data.json"]`)
 
 	// Verify base64 data is present (should contain = padding or alphanumeric)
-	if !strings.Contains(output, "=") {
-		t.Error("output missing base64 encoded data")
-	}
+	assert.Contains(t, output, "=")
+
 }
 
 func TestGenerateEmbeddedEmpty(t *testing.T) {
 	output, err := GenerateEmbedded(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output, "declare -A __bashfs_data") {
-		t.Error("empty output should still have array declaration")
-	}
+	require.Nil(t, err)
+
+	assert.Contains(t, output, "declare -A __bashfs_data")
+
 }
 
 func mustWriteFile(t *testing.T, path, content string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
+
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+
 }
