@@ -1,7 +1,9 @@
 package packager
 
 import (
+	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -92,6 +94,35 @@ func TestPackagePreservesIndentation(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestPackageRunsDirectAndPiped(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir)
+	require.Nil(t, err)
+
+	scriptPath := filepath.Join(dir, "packaged.sh")
+	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
+
+	// Direct execution: BASH_SOURCE[0] is a real path, trampoline skipped.
+	out, err := exec.Command("bash", scriptPath).Output()
+	require.Nil(t, err)
+	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
+
+	// Piped execution (simulates curl ... | bash): BASH_SOURCE[0]="main",
+	// trampoline must spool stdin to a tempfile and re-exec.
+	cmd := exec.Command("bash")
+	cmd.Stdin = bytes.NewReader(result.Data)
+	out, err = cmd.Output()
+	require.Nil(t, err)
+	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 }
 
 func mustWriteFile(t *testing.T, path, content string) {

@@ -61,8 +61,8 @@ func TestGenerateEmbedded(t *testing.T) {
 	assert.Contains(t, result.Script, `["hello.txt"]`)
 	assert.Contains(t, result.Script, `["sub/data.json"]`)
 
-	// Verify payload offset placeholder
-	assert.Contains(t, result.Script, OffsetPlaceholder)
+	// Verify payload size is embedded (used for runtime offset calc)
+	assert.Contains(t, result.Script, "__bashfs_payload_size=")
 
 	// Verify binary payload is non-empty
 	assert.NotEmpty(t, result.Payload)
