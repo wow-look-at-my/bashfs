@@ -49,9 +49,12 @@ func fixtureDir(b *testing.B, fileCount, fileSize int) []fswalker.FileEntry {
 func BenchmarkGenerateEmbedded(b *testing.B) {
 	for _, s := range benchSizes {
 		files := fixtureDir(b, s.fileCount, s.fileSize)
-		totalBytes := int64(s.fileCount * s.fileSize)
 		b.Run(s.label, func(b *testing.B) {
-			b.SetBytes(totalBytes)
+			// b.SetBytes is intentionally omitted: it makes go test inject
+			// `MB/s` between `ns/op` and `B/op`, which trips the regex in
+			// go-toolchain's bench output parser and zeroes the alloc
+			// columns. Throughput is implied by ns/op vs the fixture size.
+			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				if _, err := GenerateEmbedded(files); err != nil {
@@ -65,9 +68,12 @@ func BenchmarkGenerateEmbedded(b *testing.B) {
 func BenchmarkGenerateEmbeddedBase64(b *testing.B) {
 	for _, s := range benchSizes {
 		files := fixtureDir(b, s.fileCount, s.fileSize)
-		totalBytes := int64(s.fileCount * s.fileSize)
 		b.Run(s.label, func(b *testing.B) {
-			b.SetBytes(totalBytes)
+			// b.SetBytes is intentionally omitted: it makes go test inject
+			// `MB/s` between `ns/op` and `B/op`, which trips the regex in
+			// go-toolchain's bench output parser and zeroes the alloc
+			// columns. Throughput is implied by ns/op vs the fixture size.
+			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				if _, err := GenerateEmbeddedBase64(files); err != nil {
