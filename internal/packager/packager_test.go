@@ -26,7 +26,7 @@ echo "after"
 bashfs_cat greeting.txt
 `
 
-	result, err := Package(script, dir)
+	result, err := Package(script, dir, Options{})
 	require.Nil(t, err)
 
 	output := string(result.Data)
@@ -51,7 +51,7 @@ bashfs_cat greeting.txt
 }
 
 func TestPackageNoEval(t *testing.T) {
-	_, err := Package("#!/bin/bash\necho hello\n", "/tmp")
+	_, err := Package("#!/bin/bash\necho hello\n", "/tmp", Options{})
 	require.NotNil(t, err)
 	assert.Contains(t, err.Error(), "no 'eval $(bashfs gen ...)' line found")
 }
@@ -61,7 +61,7 @@ func TestPackageMultipleEval(t *testing.T) {
 eval $(bashfs gen ./a)
 eval $(bashfs gen ./b)
 `
-	_, err := Package(script, "/tmp")
+	_, err := Package(script, "/tmp", Options{})
 	require.NotNil(t, err)
 	assert.Contains(t, err.Error(), "multiple")
 }
@@ -74,7 +74,7 @@ func TestPackageQuotedPath(t *testing.T) {
 	script := `#!/bin/bash
 eval $(bashfs gen "./myfiles")
 `
-	result, err := Package(script, dir)
+	result, err := Package(script, dir, Options{})
 	require.Nil(t, err)
 	assert.Contains(t, string(result.Data), "declare -A __bashfs_offset")
 }
@@ -85,7 +85,7 @@ func TestPackagePreservesIndentation(t *testing.T) {
 	mustWriteFile(t, filepath.Join(fsDir, "test.txt"), "data")
 
 	script := "#!/bin/bash\n    eval $(bashfs gen ./myfiles)\n"
-	result, err := Package(script, dir)
+	result, err := Package(script, dir, Options{})
 	require.Nil(t, err)
 
 	for _, line := range strings.Split(string(result.Data), "\n") {
@@ -105,7 +105,7 @@ func TestPackageRunsDirectAndPiped(t *testing.T) {
 eval $(bashfs gen ./myfiles)
 bashfs_cat greeting.txt
 `
-	result, err := Package(script, dir)
+	result, err := Package(script, dir, Options{})
 	require.Nil(t, err)
 
 	scriptPath := filepath.Join(dir, "packaged.sh")
@@ -121,6 +121,82 @@ bashfs_cat greeting.txt
 	cmd := exec.Command("bash")
 	cmd.Stdin = bytes.NewReader(result.Data)
 	out, err = cmd.Output()
+	require.Nil(t, err)
+	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
+}
+
+func TestPackageBase64RunsDirectAndPiped(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+	mustWriteFile(t, filepath.Join(fsDir, "sub", "data.json"), `{"port":8080}`)
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+bashfs_cat sub/data.json
+`
+	result, err := Package(script, dir, Options{Encoding: EncodingBase64})
+	require.Nil(t, err)
+
+	output := string(result.Data)
+
+	// Sanity: base64 mode should advertise itself in the generated header.
+	assert.Contains(t, output, "base64 mode")
+	// Pipeline must include the base64 -d step before gzip -d.
+	assert.Contains(t, output, "| base64 -d | gzip -d")
+
+	// The bytes after `exit 0\n` are the trailing payload — in base64 mode
+	// they MUST be printable ASCII for copy-paste through text channels to
+	// work. This is the load-bearing guarantee of this mode.
+	exitIdx := strings.Index(output, "\nexit 0\n")
+	require.GreaterOrEqual(t, exitIdx, 0)
+	payloadStart := exitIdx + len("\nexit 0\n")
+	for i := payloadStart; i < len(result.Data); i++ {
+		b := result.Data[i]
+		ok := b == 0x09 || b == 0x0A || b == 0x0D || (b >= 0x20 && b <= 0x7E)
+		require.Truef(t, ok, "non-printable byte 0x%02x at offset %d in base64-mode payload", b, i)
+	}
+
+	scriptPath := filepath.Join(dir, "packaged.sh")
+	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
+
+	// Direct execution.
+	out, err := exec.Command("bash", scriptPath).Output()
+	require.Nil(t, err)
+	assert.Equal(t, `hello world{"port":8080}`, strings.TrimSpace(string(out)))
+
+	// Piped execution.
+	cmd := exec.Command("bash")
+	cmd.Stdin = bytes.NewReader(result.Data)
+	out, err = cmd.Output()
+	require.Nil(t, err)
+	assert.Equal(t, `hello world{"port":8080}`, strings.TrimSpace(string(out)))
+}
+
+func TestPackageBase64SurvivesTextRoundTrip(t *testing.T) {
+	// This is the whole point of base64 mode: take the packaged script,
+	// shove it through a string-typed channel (bytes -> string -> bytes),
+	// write the result back out, and confirm it still runs identically.
+	// In raw mode this would corrupt the binary payload; in base64 mode
+	// it must be lossless because every byte is printable ASCII.
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir, Options{Encoding: EncodingBase64})
+	require.Nil(t, err)
+
+	roundTripped := []byte(string(result.Data))
+	assert.Equal(t, result.Data, roundTripped, "base64-mode payload must survive a string round-trip byte-for-byte")
+
+	scriptPath := filepath.Join(dir, "pasted.sh")
+	require.NoError(t, os.WriteFile(scriptPath, roundTripped, 0755))
+	out, err := exec.Command("bash", scriptPath).Output()
 	require.Nil(t, err)
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 }
