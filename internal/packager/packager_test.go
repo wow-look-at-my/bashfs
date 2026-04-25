@@ -201,6 +201,36 @@ bashfs_cat greeting.txt
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 }
 
+func TestEncodingString(t *testing.T) {
+	assert.Equal(t, "raw", EncodingRaw.String())
+	assert.Equal(t, "base64", EncodingBase64.String())
+	// Out-of-range values should self-describe rather than panic — useful
+	// when an Encoding value shows up in an error message somewhere.
+	assert.Equal(t, "encoding(99)", Encoding(99).String())
+}
+
+func TestEncodingSet(t *testing.T) {
+	var e Encoding
+	require.NoError(t, e.Set("raw"))
+	assert.Equal(t, EncodingRaw, e)
+
+	require.NoError(t, e.Set("base64"))
+	assert.Equal(t, EncodingBase64, e)
+
+	err := e.Set("hex")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "raw")
+	assert.Contains(t, err.Error(), "base64")
+	// Failed Set must leave the value unchanged so cobra reports the bad
+	// flag without silently switching the encoding to a default.
+	assert.Equal(t, EncodingBase64, e)
+}
+
+func TestEncodingType(t *testing.T) {
+	var e Encoding
+	assert.Equal(t, "encoding", e.Type())
+}
+
 func mustWriteFile(t *testing.T, path, content string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))

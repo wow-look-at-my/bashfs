@@ -14,6 +14,10 @@ var evalPattern = regexp.MustCompile(`^(\s*)eval\s+\$\(bashfs\s+gen\s+(.+?)\)\s*
 
 // Encoding selects how the trailing payload is laid out at the end of the
 // packaged script.
+//
+// Encoding implements pflag.Value (String/Set/Type) so cobra can bind it
+// directly via Flags().Var, enforcing the raw|base64 choice at parse time
+// and surfacing it in --help.
 type Encoding int
 
 const (
@@ -27,6 +31,39 @@ const (
 	// survives copy-paste through any text channel).
 	EncodingBase64
 )
+
+// Encodings lists the valid Encoding string values, in user-facing order.
+// Cobra uses this for shell completion of --encoding.
+var Encodings = []string{"raw", "base64"}
+
+// String returns the canonical CLI name of the encoding.
+func (e Encoding) String() string {
+	switch e {
+	case EncodingRaw:
+		return "raw"
+	case EncodingBase64:
+		return "base64"
+	default:
+		return fmt.Sprintf("encoding(%d)", int(e))
+	}
+}
+
+// Set parses a CLI value into the Encoding. Implements pflag.Value.
+func (e *Encoding) Set(s string) error {
+	switch s {
+	case "raw":
+		*e = EncodingRaw
+	case "base64":
+		*e = EncodingBase64
+	default:
+		return fmt.Errorf("must be one of: %s", strings.Join(Encodings, ", "))
+	}
+	return nil
+}
+
+// Type returns the type name shown in --help (e.g. "--encoding encoding").
+// Implements pflag.Value.
+func (e *Encoding) Type() string { return "encoding" }
 
 // Options controls Package behavior. Adding fields here is the extension
 // point for future flags (e.g. compression off) without breaking the

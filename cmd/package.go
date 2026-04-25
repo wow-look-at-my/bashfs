@@ -12,15 +12,21 @@ import (
 
 func init() {
 	packageCmd.Flags().StringVarP(&outputFlag, "output", "o", "", "output file path (required)")
-	packageCmd.Flags().StringVar(&encodingFlag, "encoding", "raw",
-		"payload encoding: 'raw' (binary, smallest) or 'base64' (printable ASCII, copy-paste safe)")
+	packageCmd.Flags().Var(&encodingFlag, "encoding",
+		fmt.Sprintf("payload encoding (one of: %s) — base64 trades ~33%% size for copy-paste safety", packager.Encodings))
+	if err := packageCmd.RegisterFlagCompletionFunc("encoding",
+		cobra.FixedCompletions(packager.Encodings, cobra.ShellCompDirectiveNoFileComp)); err != nil {
+		// Registration only fails if the flag doesn't exist — we just
+		// declared it, so this is a programmer error.
+		panic(err)
+	}
 	packageCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(packageCmd)
 }
 
 var (
 	outputFlag   string
-	encodingFlag string
+	encodingFlag = packager.EncodingRaw // default; overridden by --encoding
 )
 
 var packageCmd = &cobra.Command{
@@ -40,11 +46,6 @@ The trailing payload encoding is controlled by --encoding:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		scriptPath := args[0]
 
-		enc, err := parseEncoding(encodingFlag)
-		if err != nil {
-			return err
-		}
-
 		content, err := os.ReadFile(scriptPath)
 		if err != nil {
 			return fmt.Errorf("reading script %s: %w", scriptPath, err)
@@ -56,7 +57,7 @@ The trailing payload encoding is controlled by --encoding:
 			return fmt.Errorf("resolving script directory: %w", err)
 		}
 
-		result, err := packager.Package(string(content), absScriptDir, packager.Options{Encoding: enc})
+		result, err := packager.Package(string(content), absScriptDir, packager.Options{Encoding: encodingFlag})
 		if err != nil {
 			return err
 		}
@@ -68,15 +69,4 @@ The trailing payload encoding is controlled by --encoding:
 		fmt.Fprintf(os.Stderr, "bashfs: packaged %s -> %s (encoding=%s)\n", scriptPath, outputFlag, encodingFlag)
 		return nil
 	},
-}
-
-func parseEncoding(s string) (packager.Encoding, error) {
-	switch s {
-	case "raw":
-		return packager.EncodingRaw, nil
-	case "base64":
-		return packager.EncodingBase64, nil
-	default:
-		return 0, fmt.Errorf("unknown encoding %q (expected 'raw' or 'base64')", s)
-	}
 }
