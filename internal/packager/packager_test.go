@@ -146,7 +146,7 @@ bashfs_cat sub/data.json
 	// Pipeline must include the base64 -d step before gzip -d.
 	assert.Contains(t, output, "| base64 -d | gzip -d")
 
-	// The bytes after `exit 0\n` are the trailing payload — in base64 mode
+	// The bytes after `exit 0\n` are the trailing payload - in base64 mode
 	// they MUST be printable ASCII for copy-paste through text channels to
 	// work. This is the load-bearing guarantee of this mode.
 	exitIdx := strings.Index(output, "\nexit 0\n")
@@ -204,7 +204,7 @@ bashfs_cat greeting.txt
 func TestEncodingString(t *testing.T) {
 	assert.Equal(t, "raw", EncodingRaw.String())
 	assert.Equal(t, "base64", EncodingBase64.String())
-	// Out-of-range values should self-describe rather than panic — useful
+	// Out-of-range values should self-describe rather than panic - useful
 	// when an Encoding value shows up in an error message somewhere.
 	assert.Equal(t, "encoding(99)", Encoding(99).String())
 }
