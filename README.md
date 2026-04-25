@@ -28,10 +28,11 @@ bashfs_extract template.txt /tmp/out.txt  # extract to a file
 
 ### Distribution: `bashfs package`
 
-When ready to distribute, package everything into a single self-contained script:
+When ready to distribute, package everything into a single self-contained script. The packaged script is written to stdout — redirect it to a file:
 
 ```bash
-bashfs package myscript.sh -o dist/myscript.sh
+bashfs package myscript.sh > dist/myscript.sh
+chmod +x dist/myscript.sh
 ```
 
 This finds the `eval $(bashfs gen <dir>)` line in your script and replaces it with embedded helper functions, then appends gzip-compressed file data after an `exit 0` guard. The output script has no external file dependencies.
@@ -46,8 +47,10 @@ The trailing payload can be appended in two encodings:
 | `base64` | ~33% larger — concatenated per-file base64 chunks, pure printable ASCII | the script needs to survive a copy-paste through a text-only channel: chat clients, web forms, code review comments, JIRA, sticky notes, anywhere that strips or mangles non-printable bytes |
 
 ```bash
-bashfs package myscript.sh -o dist/myscript.sh --encoding base64
+bashfs package myscript.sh --encoding base64 > dist/myscript.sh
 ```
+
+Raw mode refuses to write to a terminal (it's binary, would trash your cursor). Always redirect, or pick `--encoding base64` if you want to inspect the output directly.
 
 Both encodings produce a single self-contained script that runs identically — the `bashfs_*` helpers transparently decode whichever payload is at the end. `curl … | bash` piping works in both modes.
 
