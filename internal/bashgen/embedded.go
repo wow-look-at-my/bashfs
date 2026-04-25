@@ -66,7 +66,7 @@ func GenerateEmbedded(files []fswalker.FileEntry) (*EmbeddedResult, error) {
 // then base64-encoded individually, and the per-file base64 chunks are
 // concatenated as the trailing payload. Offsets in the map index the base64
 // byte stream, so the runtime can slice a single file's chunk and decode just
-// that chunk — no need to base64-decode the whole payload to extract one file.
+// that chunk - no need to base64-decode the whole payload to extract one file.
 //
 // Per-file (rather than whole-payload) base64 encoding is what makes slicing
 // safe: each chunk has its own padding and starts at a 4-byte boundary in the
@@ -143,7 +143,7 @@ func writePreamble(b *strings.Builder, modeLabel string, payloadSize int, infos 
 
 // extractTemplate is the bashfs_cat / bashfs_extract pair. The only thing that
 // varies between encodings is the decode pipeline appended after the byte
-// slice — substituted via the __DECODE__ placeholder. We can't use Go format
+// slice - substituted via the __DECODE__ placeholder. We can't use Go format
 // strings here because the bash already contains literal % characters
 // (${_info%%:*} and ${_info##*:}) that fmt.Sprintf would mangle.
 const extractTemplate = `bashfs_cat() {

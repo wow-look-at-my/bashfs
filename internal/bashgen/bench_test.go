@@ -26,7 +26,7 @@ var benchSizes = []struct {
 
 // fixtureDir materializes fileCount files of fileSize random bytes each into
 // a temp dir and walks it. Uses random bytes so gzip can't trivially compress
-// the payload to nothing — the compression cost shows up in timings.
+// the payload to nothing - the compression cost shows up in timings.
 func fixtureDir(b *testing.B, fileCount, fileSize int) []fswalker.FileEntry {
 	b.Helper()
 	dir := b.TempDir()

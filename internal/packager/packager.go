@@ -149,7 +149,7 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 	// When piped via stdin, ${BASH_SOURCE[0]} is empty/main, so the helpers
 	// can't tail -c the payload off disk. Bash reads piped scripts
 	// line-by-line, so at trampoline time the rest of the script + payload
-	// is still on stdin — we spool it to a tempfile and re-exec.
+	// is still on stdin - we spool it to a tempfile and re-exec.
 	// The runtime offset calc in embedded.go (filesize - payload_size) makes
 	// this safe regardless of how the trampoline reshapes the prefix, and
 	// `cat` in the trampoline doesn't care whether the payload is binary
@@ -179,7 +179,7 @@ const trampoline = `# bashfs auto-bootstrap: re-exec from a real file when piped
 # When piped (curl ... | bash), BASH_SOURCE[0] is empty at top level, so
 # the helpers (which run inside functions where it becomes "main") can't
 # tail -c the payload off disk. Spool the rest of stdin to a tempfile
-# and re-exec — bash reads piped scripts line-by-line, so at this point
+# and re-exec - bash reads piped scripts line-by-line, so at this point
 # the rest of the script + payload is still queued on stdin.
 if [ -z "${BASH_SOURCE[0]:-}" ] || ! [ -r "${BASH_SOURCE[0]}" ]; then
   __bfs_self=$(mktemp) || { echo "bashfs: mktemp failed" >&2; exit 1; }

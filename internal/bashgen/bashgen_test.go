@@ -106,7 +106,7 @@ func TestGenerateEmbeddedBase64(t *testing.T) {
 		assert.Contains(t, result.Script, fn)
 	}
 
-	// Payload must be pure base64 alphabet — that's what makes it
+	// Payload must be pure base64 alphabet - that's what makes it
 	// copy-paste safe through text-only channels.
 	require.NotEmpty(t, result.Payload)
 	b64Alpha := regexp.MustCompile(`^[A-Za-z0-9+/=]+$`)
