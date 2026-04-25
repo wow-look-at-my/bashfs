@@ -79,6 +79,66 @@ eval $(bashfs gen "./myfiles")
 	assert.Contains(t, string(result.Data), "declare -A __bashfs_offset")
 }
 
+// TestPackageQuotedEval covers the recommended shell idiom
+// `eval "$(bashfs gen ...)"` (quoted command substitution). The README has
+// always shown this form, but historically the matcher only accepted the
+// unquoted form -- which forced users into a choice between source-mode
+// correctness (quoted) and packageability (unquoted). Both must work.
+func TestPackageQuotedEval(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval "$(bashfs gen ./myfiles)"
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir, Options{})
+	require.NoError(t, err)
+	output := string(result.Data)
+
+	// The eval line should be replaced by the embedded block.
+	assert.NotContains(t, output, `eval "$(bashfs gen`)
+	assert.NotContains(t, output, "eval $(bashfs gen")
+	assert.Contains(t, output, "declare -A __bashfs_offset")
+
+	// And the packaged script must actually run.
+	scriptPath := filepath.Join(dir, "packaged.sh")
+	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
+	out, err := exec.Command("bash", scriptPath).Output()
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
+}
+
+// TestPackageQuotedEvalWithQuotedDir covers the fully quoted variant where
+// both the command substitution and the directory argument are quoted.
+func TestPackageQuotedEvalWithQuotedDir(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "test.txt"), "data")
+
+	script := `#!/bin/bash
+eval "$(bashfs gen "./myfiles")"
+`
+	result, err := Package(script, dir, Options{})
+	require.NoError(t, err)
+	assert.Contains(t, string(result.Data), "declare -A __bashfs_offset")
+}
+
+// TestPackageMultipleEvalMixedForms makes sure the matcher counts both
+// quoted and unquoted forms when detecting "multiple eval lines" -- a user
+// who has one of each in the same script still gets the conflict error
+// rather than silently packaging only one of them.
+func TestPackageMultipleEvalMixedForms(t *testing.T) {
+	script := `#!/bin/bash
+eval $(bashfs gen ./a)
+eval "$(bashfs gen ./b)"
+`
+	_, err := Package(script, "/tmp", Options{})
+	require.NotNil(t, err)
+	assert.Contains(t, err.Error(), "multiple")
+}
+
 func TestPackagePreservesIndentation(t *testing.T) {
 	dir := t.TempDir()
 	fsDir := filepath.Join(dir, "myfiles")

@@ -10,7 +10,19 @@ import (
 	"bashfs/internal/fswalker"
 )
 
-var evalPattern = regexp.MustCompile(`^(\s*)eval\s+\$\(bashfs\s+gen\s+(.+?)\)\s*$`)
+// evalPattern matches the eval line that bashfs package replaces with the
+// embedded payload. Both the quoted and unquoted forms are accepted:
+//
+//	eval $(bashfs gen <dir>)
+//	eval "$(bashfs gen <dir>)"
+//
+// The quoted form is the recommended shell idiom (and what the README shows)
+// because it preserves the multi-line dev-mode output verbatim. The unquoted
+// form also works at runtime now that bashfs gen emits word-split-safe bash,
+// but historically only the unquoted form was accepted here -- which left
+// users who followed the README unable to package their script. The two
+// alternation branches capture the directory in groups 2 and 3 respectively.
+var evalPattern = regexp.MustCompile(`^(\s*)eval\s+(?:"\$\(bashfs\s+gen\s+(.+?)\)"|\$\(bashfs\s+gen\s+(.+?)\))\s*$`)
 
 // Encoding selects how the trailing payload is laid out at the end of the
 // packaged script.
@@ -100,7 +112,13 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 	idx := matchIdx[0]
 	matches := evalPattern.FindStringSubmatch(lines[idx])
 	indent := matches[1]
+	// matches[2] is the quoted form's dir, matches[3] is the unquoted
+	// form's dir; exactly one is populated by the alternation in
+	// evalPattern.
 	dirArg := matches[2]
+	if dirArg == "" {
+		dirArg = matches[3]
+	}
 
 	// Strip surrounding quotes if present
 	dirArg = strings.Trim(dirArg, `"'`)
