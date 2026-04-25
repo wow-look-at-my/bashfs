@@ -35,7 +35,7 @@ bashfs package myscript.sh > dist/myscript.sh
 chmod +x dist/myscript.sh
 ```
 
-This finds the `eval $(bashfs gen <dir>)` line in your script and replaces it with embedded helper functions, then appends gzip-compressed file data after an `exit 0` guard. The output script has no external file dependencies.
+This finds the `eval "$(bashfs gen <dir>)"` line in your script (the unquoted `eval $(bashfs gen <dir>)` form is also accepted) and replaces it with embedded helper functions, then appends gzip-compressed file data after an `exit 0` guard. The output script has no external file dependencies.
 
 #### `--encoding raw` (default) vs `--encoding base64`
 

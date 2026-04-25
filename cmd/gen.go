@@ -20,7 +20,12 @@ var genCmd = &cobra.Command{
 	Long: `Generates bash functions (bashfs_cat, bashfs_extract, bashfs_list, bashfs_jq)
 that reference real files on disk. Use with eval in your script during development:
 
-  eval $(bashfs gen ./myfiles)`,
+  eval "$(bashfs gen ./myfiles)"
+
+The unquoted form (eval $(bashfs gen ./myfiles)) is also accepted -- the
+output is laid out so that bash word-splitting in the unquoted form does not
+break the function definitions. The quoted form is still recommended as the
+correct shell idiom.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir := args[0]

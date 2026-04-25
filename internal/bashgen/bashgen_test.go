@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"bashfs/internal/fswalker"
@@ -42,6 +45,105 @@ func TestGenerateDevMode(t *testing.T) {
 	absDir, _ := filepath.Abs(dir)
 	assert.Contains(t, output, absDir)
 
+	// Word-split safety: each function definition must end with `;` so
+	// that adjacent defs don't fuse together when bash word-splits the
+	// command substitution in the unquoted `eval $(bashfs gen ...)` form
+	// and re-joins the words with spaces. Also: no `#` may appear before
+	// the first function, or it would swallow every following word.
+	hashIdx := strings.Index(output, "#")
+	if hashIdx >= 0 {
+		firstFnIdx := strings.Index(output, "bashfs_cat()")
+		require.Greaterf(t, hashIdx, firstFnIdx,
+			"a `#` appears before the first function def at offset %d (firstFn=%d); the unquoted eval form would silently no-op",
+			hashIdx, firstFnIdx)
+	}
+	for _, fn := range []string{"bashfs_cat", "bashfs_extract", "bashfs_list", "bashfs_jq"} {
+		// Each function's body opens with `{` and the closing brace must
+		// be followed by `;` so the next word after newline-collapse is
+		// a separator, not glued onto the next function name.
+		fnStart := strings.Index(output, fn+"()")
+		require.GreaterOrEqualf(t, fnStart, 0, "%s missing", fn)
+		// Find the matching `};` (closing brace + statement separator)
+		// somewhere after the function name on the same logical line.
+		tail := output[fnStart:]
+		nl := strings.Index(tail, "\n")
+		require.GreaterOrEqualf(t, nl, 0, "%s has no terminating newline", fn)
+		line := tail[:nl]
+		require.Truef(t, strings.HasSuffix(line, "};"),
+			"%s line does not end with `};` (got %q); adjacent def would fuse after word-split",
+			fn, line)
+	}
+}
+
+// TestGenerateDevModeRunsUnderEvalBothForms is the load-bearing regression
+// test for the multi-line-eval bug: the dev-mode output must work whether
+// the caller writes `eval "$(...)"` (quoted, recommended) or the unquoted
+// `eval $(...)` form. Historically the unquoted form silently no-op'd
+// because bash word-split the multi-line output and the leading `#` comment
+// swallowed the rest, leaving no functions defined. This test runs a real
+// bash and asserts the helpers actually produce output in both forms.
+func TestGenerateDevModeRunsUnderEvalBothForms(t *testing.T) {
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "greeting.txt"), "hello world")
+	mustWriteFile(t, filepath.Join(dir, "sub", "data.json"), `{"port":8080}`)
+
+	files, err := fswalker.Walk(dir)
+	require.NoError(t, err)
+
+	output, err := GenerateDevMode(files, dir)
+	require.NoError(t, err)
+
+	cases := []struct {
+		name   string
+		evalIn string
+	}{
+		// Quoted: command substitution preserves whitespace, so even if
+		// the generator emitted multi-line code this would Just Work.
+		{"quoted", `eval "$GEN"`},
+		// Unquoted: bash word-splits $GEN before eval sees it. This is
+		// the form the bug report fired on.
+		{"unquoted", `eval $GEN`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Trailing `echo` after each bashfs_cat forces a newline
+			// since the test fixtures don't end in one. bashfs_extract
+			// is exercised separately so the helpers are all hit.
+			extractDest := filepath.Join(t.TempDir(), "extracted.txt")
+			script := fmt.Sprintf(`set -euo pipefail
+GEN=%s
+%s
+bashfs_cat greeting.txt; echo
+bashfs_cat sub/data.json; echo
+bashfs_list
+bashfs_extract greeting.txt %s
+cat %s; echo
+`, shellSingleQuote(output), tc.evalIn,
+				shellSingleQuote(extractDest), shellSingleQuote(extractDest))
+
+			cmd := exec.Command("bash", "-c", script)
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
+			out, err := cmd.Output()
+			require.NoErrorf(t, err, "bash failed (stderr=%q)", stderr.String())
+
+			got := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+			want := []string{
+				"hello world",
+				`{"port":8080}`,
+				"greeting.txt",
+				"sub/data.json",
+				"hello world",
+			}
+			assert.Equal(t, want, got, "stderr=%q", stderr.String())
+		})
+	}
+}
+
+// shellSingleQuote wraps s in single quotes for safe inclusion in a bash
+// script literal, escaping any embedded single quotes.
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func TestGenerateEmbedded(t *testing.T) {
