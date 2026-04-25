@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"bashfs/internal/fswalker"
+	"github.com/wow-look-at-my/testify/require"
 )
 
 // benchSizes is the matrix of "total bytes worth of fixture across N files"
@@ -31,18 +32,13 @@ func fixtureDir(b *testing.B, fileCount, fileSize int) []fswalker.FileEntry {
 	dir := b.TempDir()
 	for i := 0; i < fileCount; i++ {
 		data := make([]byte, fileSize)
-		if _, err := rand.Read(data); err != nil {
-			b.Fatalf("rand: %v", err)
-		}
+		_, err := rand.Read(data)
+		require.NoError(b, err)
 		path := filepath.Join(dir, fmt.Sprintf("file%03d.bin", i))
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			b.Fatalf("write: %v", err)
-		}
+		require.NoError(b, os.WriteFile(path, data, 0644))
 	}
 	files, err := fswalker.Walk(dir)
-	if err != nil {
-		b.Fatalf("walk: %v", err)
-	}
+	require.NoError(b, err)
 	return files
 }
 
@@ -50,16 +46,16 @@ func BenchmarkGenerateEmbedded(b *testing.B) {
 	for _, s := range benchSizes {
 		files := fixtureDir(b, s.fileCount, s.fileSize)
 		b.Run(s.label, func(b *testing.B) {
-			// b.SetBytes is intentionally omitted: it makes go test inject
-			// `MB/s` between `ns/op` and `B/op`, which trips the regex in
-			// go-toolchain's bench output parser and zeroes the alloc
-			// columns. Throughput is implied by ns/op vs the fixture size.
+			// b.SetBytes is intentionally omitted: it makes the testing
+			// framework inject `MB/s` between `ns/op` and `B/op`, which
+			// trips the regex in go-toolchain's bench output parser and
+			// zeroes the alloc columns. Throughput is implied by ns/op
+			// vs the fixture size.
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := GenerateEmbedded(files); err != nil {
-					b.Fatal(err)
-				}
+				_, err := GenerateEmbedded(files)
+				require.NoError(b, err)
 			}
 		})
 	}
@@ -69,16 +65,11 @@ func BenchmarkGenerateEmbeddedBase64(b *testing.B) {
 	for _, s := range benchSizes {
 		files := fixtureDir(b, s.fileCount, s.fileSize)
 		b.Run(s.label, func(b *testing.B) {
-			// b.SetBytes is intentionally omitted: it makes go test inject
-			// `MB/s` between `ns/op` and `B/op`, which trips the regex in
-			// go-toolchain's bench output parser and zeroes the alloc
-			// columns. Throughput is implied by ns/op vs the fixture size.
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := GenerateEmbeddedBase64(files); err != nil {
-					b.Fatal(err)
-				}
+				_, err := GenerateEmbeddedBase64(files)
+				require.NoError(b, err)
 			}
 		})
 	}
