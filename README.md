@@ -22,7 +22,7 @@ eval "$(bashfs gen ./myfiles)"
 
 bashfs_list                      # list all files
 bashfs_cat config.json           # print file contents to stdout
-bashfs_jq config.json .port     # run jq on a file
+bashfs_cat config.json | jq .port  # use jq on a file
 bashfs_extract template.txt /tmp/out.txt  # extract to a file
 ```
 
@@ -61,7 +61,6 @@ Both encodings produce a single self-contained script that runs identically - th
 | `bashfs_cat <path>` | Print file contents to stdout |
 | `bashfs_extract <path> <dest>` | Extract a file to the given destination |
 | `bashfs_list` | List all embedded file paths |
-| `bashfs_jq <path> [filter]` | Run jq on a file (filter defaults to `.`) |
 
 ## How It Works
 
@@ -82,7 +81,7 @@ eval "$(bashfs gen ./assets)"
 echo "Available files:"
 bashfs_list
 echo "Config:"
-bashfs_jq config.json .database.host
+bashfs_cat config.json | jq .database.host
 ```
 
 **Package it:**

@@ -4,23 +4,34 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"bashfs/internal/fswalker"
 )
 
+type devModeData struct {
+	AbsDir string
+	Files  []fswalker.FileEntry
+}
+
+var devModeTmpl = template.Must(template.New("devmode").Parse(devModeTemplate))
+
+// Each function is on a single line ending with `};` so that the output
+// survives the unquoted `eval $(bashfs gen ...)` form. Without quotes, bash
+// word-splits on IFS before eval sees the text, so no `#` comments and no
+// bare `}` without a trailing `;` (which would fuse with the next token).
+const devModeTemplate = `bashfs_cat() { local _bashfs_file="{{.AbsDir}}/$1"; if [ ! -f "$_bashfs_file" ]; then echo "bashfs: file not found: $1" >&2; return 1; fi; cat "$_bashfs_file"; };
+bashfs_extract() { mkdir -p "$(dirname "$2")" && bashfs_cat "$1" > "$2"; };
+bashfs_list() {
+{{- if not .Files}} :;{{else}}{{range .Files}} echo '{{.RelPath}}';{{end}}{{end}} };
+`
+
 // GenerateDevMode produces bash code that references real files on disk.
-// The returned code defines bashfs_cat, bashfs_extract, bashfs_list, and bashfs_jq functions.
+// The returned code defines bashfs_cat, bashfs_extract, and bashfs_list
+// functions.
 //
 // The output is laid out so that BOTH `eval "$(bashfs gen <dir>)"` and the
-// unquoted `eval $(bashfs gen <dir>)` work. Without quotes, bash word-splits
-// the command substitution on IFS (space, tab, newline) before eval sees it,
-// then eval re-joins the words with spaces. To survive that round-trip:
-//   - No leading or interior comments -- a `#` would swallow every following
-//     word and silently leave no functions defined.
-//   - Statements separated by `;`, never just by newlines.
-//   - A trailing `;` after each closing `}` so two adjacent function
-//     definitions don't fuse into a single un-parseable command after
-//     newlines collapse to spaces.
+// unquoted `eval $(bashfs gen <dir>)` work. See devModeTemplate for details.
 func GenerateDevMode(files []fswalker.FileEntry, baseDir string) (string, error) {
 	absDir, err := filepath.Abs(baseDir)
 	if err != nil {
@@ -28,23 +39,13 @@ func GenerateDevMode(files []fswalker.FileEntry, baseDir string) (string, error)
 	}
 
 	var b strings.Builder
-
-	fmt.Fprintf(&b, `bashfs_cat() { local _bashfs_file="%s/$1"; if [ ! -f "$_bashfs_file" ]; then echo "bashfs: file not found: $1" >&2; return 1; fi; cat "$_bashfs_file"; };`+"\n", absDir)
-
-	fmt.Fprintf(&b, `bashfs_extract() { local _bashfs_file="%s/$1"; local _bashfs_dest="$2"; if [ ! -f "$_bashfs_file" ]; then echo "bashfs: file not found: $1" >&2; return 1; fi; mkdir -p "$(dirname "$_bashfs_dest")" && cp "$_bashfs_file" "$_bashfs_dest"; };`+"\n", absDir)
-
-	b.WriteString("bashfs_list() {")
-	if len(files) == 0 {
-		// bash rejects an empty function body, so emit a no-op for the
-		// zero-file case.
-		b.WriteString(" :;")
+	err = devModeTmpl.Execute(&b, devModeData{
+		AbsDir: absDir,
+		Files:  files,
+	})
+	if err != nil {
+		return "", fmt.Errorf("executing template: %w", err)
 	}
-	for _, f := range files {
-		fmt.Fprintf(&b, " echo '%s';", f.RelPath)
-	}
-	b.WriteString(" };\n")
-
-	fmt.Fprintf(&b, `bashfs_jq() { local _bashfs_file="%s/$1"; if [ ! -f "$_bashfs_file" ]; then echo "bashfs: file not found: $1" >&2; return 1; fi; jq "${2:-.}" "$_bashfs_file"; };`+"\n", absDir)
 
 	return b.String(), nil
 }
