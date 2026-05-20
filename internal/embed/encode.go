@@ -3,7 +3,9 @@ package embed
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -21,6 +23,12 @@ func Compress(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("finalizing compression: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+// Checksum returns the SHA-256 hex digest of data.
+func Checksum(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
 }
 
 // Encode gzip-compresses data and returns the result as a base64 string.

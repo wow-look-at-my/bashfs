@@ -161,7 +161,7 @@ func TestGenerateEmbedded(t *testing.T) {
 	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
 
 	// Verify functions
-	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
+	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()", "bashfs_verify()"} {
 		assert.Contains(t, result.Script, fn)
 	}
 
@@ -171,6 +171,10 @@ func TestGenerateEmbedded(t *testing.T) {
 
 	// Verify payload size is embedded (used for runtime offset calc)
 	assert.Contains(t, result.Script, "__bashfs_payload_size=")
+
+	// Verify integrity check variables are embedded
+	assert.Contains(t, result.Script, "__bashfs_payload_sha256=")
+	assert.Contains(t, result.Script, "__bashfs_verified=0")
 
 	// Verify binary payload is non-empty
 	assert.NotEmpty(t, result.Payload)
@@ -204,7 +208,9 @@ func TestGenerateEmbeddedBase64(t *testing.T) {
 	// Standard scaffolding is identical to raw mode.
 	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
 	assert.Contains(t, result.Script, "__bashfs_payload_size=")
-	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
+	assert.Contains(t, result.Script, "__bashfs_payload_sha256=")
+	assert.Contains(t, result.Script, "__bashfs_verified=0")
+	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()", "bashfs_verify()"} {
 		assert.Contains(t, result.Script, fn)
 	}
 

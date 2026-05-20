@@ -62,6 +62,7 @@ Both encodings produce a single self-contained script that runs identically - th
 | `bashfs_extract <path> <dest>` | Extract a file to the given destination |
 | `bashfs_list` | List all embedded file paths |
 | `bashfs_jq <path> [filter]` | Run jq on a file (filter defaults to `.`) |
+| `bashfs_verify` | Verify payload integrity (SHA-256); called automatically on first extraction |
 
 ## How It Works
 
@@ -70,7 +71,8 @@ Both encodings produce a single self-contained script that runs identically - th
 3. With `--encoding raw` (default), the compressed bytes are concatenated and appended as the trailing payload. With `--encoding base64`, each file's compressed bytes are individually base64-encoded and the per-file chunks are concatenated as the trailing payload - every chunk is self-contained valid base64, so the runtime can slice and decode one file's chunk without touching the rest.
 4. An `exit 0` guard separates the script body from the trailing payload
 5. File offsets and lengths are stored in a bash associative array (`declare -A`, requires bash 4+) - offsets index the trailing payload byte-stream regardless of encoding
-6. Helper functions use `tail -c` + `head -c` to extract a file's chunk, then pipe through `base64 -d` (base64 mode only) and `gzip -d`
+6. A SHA-256 checksum of the payload is embedded in the script; on first extraction, the payload is verified against this checksum to detect corruption or truncation
+7. Helper functions use `tail -c` + `head -c` to extract a file's chunk, then pipe through `base64 -d` (base64 mode only) and `gzip -d`
 
 ## Example
 
