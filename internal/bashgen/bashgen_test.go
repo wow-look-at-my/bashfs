@@ -172,6 +172,10 @@ func TestGenerateEmbedded(t *testing.T) {
 	// Verify payload size is embedded (used for runtime offset calc)
 	assert.Contains(t, result.Script, "__bashfs_payload_size=")
 
+	// Verify integrity check is embedded
+	assert.Contains(t, result.Script, "__bashfs_payload_sha256=")
+	assert.Contains(t, result.Script, "sha256sum")
+
 	// Verify binary payload is non-empty
 	assert.NotEmpty(t, result.Payload)
 }
@@ -204,6 +208,8 @@ func TestGenerateEmbeddedBase64(t *testing.T) {
 	// Standard scaffolding is identical to raw mode.
 	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
 	assert.Contains(t, result.Script, "__bashfs_payload_size=")
+	assert.Contains(t, result.Script, "__bashfs_payload_sha256=")
+	assert.Contains(t, result.Script, "sha256sum")
 	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
 		assert.Contains(t, result.Script, fn)
 	}
