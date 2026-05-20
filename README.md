@@ -69,7 +69,8 @@ Both encodings produce a single self-contained script that runs identically - th
 3. With `--encoding raw` (default), the compressed bytes are concatenated and appended as the trailing payload. With `--encoding base64`, each file's compressed bytes are individually base64-encoded and the per-file chunks are concatenated as the trailing payload - every chunk is self-contained valid base64, so the runtime can slice and decode one file's chunk without touching the rest.
 4. An `exit 0` guard separates the script body from the trailing payload
 5. File offsets and lengths are stored in a bash associative array (`declare -A`, requires bash 4+) - offsets index the trailing payload byte-stream regardless of encoding
-6. Helper functions use `tail -c` + `head -c` to extract a file's chunk, then pipe through `base64 -d` (base64 mode only) and `gzip -d`
+6. A SHA-256 checksum of the payload is embedded in the script and verified at load time, catching corruption or truncation before any user code runs
+7. Helper functions use `tail -c` + `head -c` to extract a file's chunk, then pipe through `base64 -d` (base64 mode only) and `gzip -d`
 
 ## Example
 

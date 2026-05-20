@@ -37,6 +37,7 @@ bashfs_cat greeting.txt
 	// Embedded code should be present
 	assert.Contains(t, output, "declare -A __bashfs_offset")
 	assert.Contains(t, output, "bashfs_cat()")
+	assert.Contains(t, output, "__bashfs_payload_sha256=")
 
 	// Surrounding lines should be preserved
 	assert.Contains(t, output, `echo "before"`)
@@ -259,6 +260,68 @@ bashfs_cat greeting.txt
 	out, err := exec.Command("bash", scriptPath).Output()
 	require.Nil(t, err)
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
+}
+
+func TestPackageIntegrityCheckCatchesTruncation(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	for _, enc := range []struct {
+		name string
+		opts Options
+	}{
+		{"raw", Options{Encoding: EncodingRaw}},
+		{"base64", Options{Encoding: EncodingBase64}},
+	} {
+		t.Run(enc.name, func(t *testing.T) {
+			result, err := Package(script, dir, enc.opts)
+			require.NoError(t, err)
+
+			truncated := result.Data[:len(result.Data)-10]
+			scriptPath := filepath.Join(t.TempDir(), "truncated.sh")
+			require.NoError(t, os.WriteFile(scriptPath, truncated, 0755))
+
+			cmd := exec.Command("bash", scriptPath)
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
+			out, err := cmd.Output()
+			require.Error(t, err, "truncated script should fail")
+			assert.Empty(t, strings.TrimSpace(string(out)), "truncated script should produce no stdout")
+			assert.Contains(t, stderr.String(), "integrity check failed")
+		})
+	}
+}
+
+func TestPackageIntegrityCheckCatchesCorruption(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir, Options{Encoding: EncodingBase64})
+	require.NoError(t, err)
+
+	corrupted := make([]byte, len(result.Data))
+	copy(corrupted, result.Data)
+	corrupted[len(corrupted)-5] ^= 0xFF
+
+	scriptPath := filepath.Join(t.TempDir(), "corrupted.sh")
+	require.NoError(t, os.WriteFile(scriptPath, corrupted, 0755))
+
+	cmd := exec.Command("bash", scriptPath)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	_, err = cmd.Output()
+	require.Error(t, err, "corrupted script should fail")
+	assert.Contains(t, stderr.String(), "integrity check failed")
 }
 
 func TestEncodingString(t *testing.T) {
