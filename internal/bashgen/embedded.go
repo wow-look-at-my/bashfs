@@ -90,14 +90,7 @@ bashfs_cat() {
 }
 
 bashfs_extract() {
-  local _info="${__bashfs_offset[$1]}"
-  if [ -z "$_info" ]; then
-    echo "bashfs: file not found: $1" >&2
-    return 1
-  fi
-  local _off="${_info%%:*}"
-  local _len="${_info##*:}"
-  mkdir -p "$(dirname "$2")" && tail -c "+$(($(__bashfs_payload_start) + _off))" "${BASH_SOURCE[0]}" | head -c "$_len" | {{.Decode}} > "$2"
+  mkdir -p "$(dirname "$2")" && bashfs_cat "$1" > "$2"
 }
 
 bashfs_list() {

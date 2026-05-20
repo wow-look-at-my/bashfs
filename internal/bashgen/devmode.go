@@ -31,7 +31,7 @@ func GenerateDevMode(files []fswalker.FileEntry, baseDir string) (string, error)
 
 	fmt.Fprintf(&b, `bashfs_cat() { local _bashfs_file="%s/$1"; if [ ! -f "$_bashfs_file" ]; then echo "bashfs: file not found: $1" >&2; return 1; fi; cat "$_bashfs_file"; };`+"\n", absDir)
 
-	fmt.Fprintf(&b, `bashfs_extract() { local _bashfs_file="%s/$1"; local _bashfs_dest="$2"; if [ ! -f "$_bashfs_file" ]; then echo "bashfs: file not found: $1" >&2; return 1; fi; mkdir -p "$(dirname "$_bashfs_dest")" && cp "$_bashfs_file" "$_bashfs_dest"; };`+"\n", absDir)
+	b.WriteString(`bashfs_extract() { mkdir -p "$(dirname "$2")" && bashfs_cat "$1" > "$2"; };` + "\n")
 
 	b.WriteString("bashfs_list() {")
 	if len(files) == 0 {
