@@ -17,7 +17,7 @@ func init() {
 var genCmd = &cobra.Command{
 	Use:   "gen <dir>",
 	Short: "Generate bash helper functions backed by real files (for development)",
-	Long: `Generates bash functions (bashfs_cat, bashfs_extract, bashfs_list, bashfs_jq)
+	Long: `Generates bash functions (bashfs_cat, bashfs_extract, bashfs_list)
 that reference real files on disk. Use with eval in your script during development:
 
   eval "$(bashfs gen ./myfiles)"

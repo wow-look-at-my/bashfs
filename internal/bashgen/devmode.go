@@ -24,12 +24,11 @@ const devModeTemplate = `bashfs_cat() { local _bashfs_file="{{.AbsDir}}/$1"; if 
 bashfs_extract() { mkdir -p "$(dirname "$2")" && bashfs_cat "$1" > "$2"; };
 bashfs_list() {
 {{- if not .Files}} :;{{else}}{{range .Files}} echo '{{.RelPath}}';{{end}}{{end}} };
-bashfs_jq() { bashfs_cat "$1" | jq "${2:-.}"; };
 `
 
 // GenerateDevMode produces bash code that references real files on disk.
-// The returned code defines bashfs_cat, bashfs_extract, bashfs_list, and
-// bashfs_jq functions.
+// The returned code defines bashfs_cat, bashfs_extract, and bashfs_list
+// functions.
 //
 // The output is laid out so that BOTH `eval "$(bashfs gen <dir>)"` and the
 // unquoted `eval $(bashfs gen <dir>)` work. See devModeTemplate for details.

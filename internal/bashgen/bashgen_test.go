@@ -31,9 +31,8 @@ func TestGenerateDevMode(t *testing.T) {
 	require.Nil(t, err)
 
 	// Verify key functions are present
-	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
+	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()"} {
 		assert.Contains(t, output, fn)
-
 	}
 
 	// Verify file paths are listed
@@ -57,7 +56,7 @@ func TestGenerateDevMode(t *testing.T) {
 			"a `#` appears before the first function def at offset %d (firstFn=%d); the unquoted eval form would silently no-op",
 			hashIdx, firstFnIdx)
 	}
-	for _, fn := range []string{"bashfs_cat", "bashfs_extract", "bashfs_list", "bashfs_jq"} {
+	for _, fn := range []string{"bashfs_cat", "bashfs_extract", "bashfs_list"} {
 		// Each function's body opens with `{` and the closing brace must
 		// be followed by `;` so the next word after newline-collapse is
 		// a separator, not glued onto the next function name.
@@ -161,7 +160,7 @@ func TestGenerateEmbedded(t *testing.T) {
 	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
 
 	// Verify functions
-	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
+	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()"} {
 		assert.Contains(t, result.Script, fn)
 	}
 
@@ -204,7 +203,7 @@ func TestGenerateEmbeddedBase64(t *testing.T) {
 	// Standard scaffolding is identical to raw mode.
 	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
 	assert.Contains(t, result.Script, "__bashfs_payload_size=")
-	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()", "bashfs_jq()"} {
+	for _, fn := range []string{"bashfs_cat()", "bashfs_extract()", "bashfs_list()"} {
 		assert.Contains(t, result.Script, fn)
 	}
 

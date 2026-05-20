@@ -97,7 +97,6 @@ bashfs_list() {
   local _k; for _k in "${!__bashfs_offset[@]}"; do printf '%s\n' "$_k"; done | sort
 }
 
-bashfs_jq() { bashfs_cat "$1" | jq "${2:-.}"; }
 `
 
 // GenerateEmbedded produces bash code that reads compressed file data from the
