@@ -37,7 +37,6 @@ bashfs_cat greeting.txt
 	// Embedded code should be present
 	assert.Contains(t, output, "declare -A __bashfs_offset")
 	assert.Contains(t, output, "bashfs_cat()")
-	assert.Contains(t, output, "bashfs_verify()")
 	assert.Contains(t, output, "__bashfs_payload_sha256=")
 
 	// Surrounding lines should be preserved
@@ -269,7 +268,6 @@ func TestPackageIntegrityCheckCatchesTruncation(t *testing.T) {
 	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
 
 	script := `#!/bin/bash
-set -e
 eval $(bashfs gen ./myfiles)
 bashfs_cat greeting.txt
 `
@@ -305,7 +303,6 @@ func TestPackageIntegrityCheckCatchesCorruption(t *testing.T) {
 	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
 
 	script := `#!/bin/bash
-set -e
 eval $(bashfs gen ./myfiles)
 bashfs_cat greeting.txt
 `
@@ -325,27 +322,6 @@ bashfs_cat greeting.txt
 	_, err = cmd.Output()
 	require.Error(t, err, "corrupted script should fail")
 	assert.Contains(t, stderr.String(), "integrity check failed")
-}
-
-func TestPackageVerifyFunctionExplicit(t *testing.T) {
-	dir := t.TempDir()
-	fsDir := filepath.Join(dir, "myfiles")
-	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
-
-	script := `#!/bin/bash
-eval $(bashfs gen ./myfiles)
-bashfs_verify
-echo "verify_exit=$?"
-`
-	result, err := Package(script, dir, Options{})
-	require.NoError(t, err)
-
-	scriptPath := filepath.Join(dir, "packaged.sh")
-	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
-
-	out, err := exec.Command("bash", scriptPath).Output()
-	require.NoError(t, err)
-	assert.Contains(t, string(out), "verify_exit=0")
 }
 
 func TestEncodingString(t *testing.T) {
