@@ -198,10 +198,13 @@ bashfs_cat greeting.txt
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
 
+	// Direct execution: BASH_SOURCE[0] is a real path, trampoline skipped.
 	out, err := exec.Command("bash", scriptPath).Output()
 	require.Nil(t, err)
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 
+	// Piped execution (simulates curl ... | bash): BASH_SOURCE[0]="main",
+	// trampoline must spool stdin to a tempfile and re-exec.
 	cmd := exec.Command("bash")
 	cmd.Stdin = bytes.NewReader(result.Data)
 	out, err = cmd.Output()
@@ -225,10 +228,15 @@ bashfs_cat sub/data.json
 
 	output := string(result.Data)
 
+	// Sanity: base64 mode should advertise itself in the generated header.
 	assert.Contains(t, output, "base64 mode")
+	// Pipeline must include the base64 -d step before gzip -d.
 	assert.Contains(t, output, "| base64 -d | gzip -d")
 	assert.NotContains(t, output, "auto-bootstrap")
 
+	// The bytes after `exit 0\n` are the trailing payload - in base64 mode
+	// they MUST be printable ASCII for copy-paste through text channels to
+	// work. This is the load-bearing guarantee of this mode.
 	exitIdx := strings.Index(output, "\nexit 0\n")
 	require.GreaterOrEqual(t, exitIdx, 0)
 	payloadStart := exitIdx + len("\nexit 0\n")
@@ -241,6 +249,7 @@ bashfs_cat sub/data.json
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
 
+	// Direct execution.
 	out, err := exec.Command("bash", scriptPath).Output()
 	require.Nil(t, err)
 	assert.Equal(t, `hello world{"port":8080}`, strings.TrimSpace(string(out)))
@@ -263,6 +272,7 @@ bashfs_cat greeting.txt
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
 
+	// Piped execution.
 	cmd := exec.Command("bash")
 	cmd.Stdin = bytes.NewReader(result.Data)
 	out, err := cmd.Output()
