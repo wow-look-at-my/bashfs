@@ -20,13 +20,13 @@ func init() {
 		// declared it, so this is a programmer error.
 		panic(err)
 	}
-	packageCmd.Flags().BoolVar(&trampolineFlag, "trampoline", false,
-		"inject a curl|bash bootstrap shim so the script works when piped via stdin")
+	packageCmd.Flags().BoolVar(&streamableFlag, "streamable", false,
+		"inject a bootstrap shim so the script works when piped via stdin (curl|bash)")
 	rootCmd.AddCommand(packageCmd)
 }
 
 var encodingFlag = packager.EncodingRaw // default; overridden by --encoding
-var trampolineFlag bool
+var streamableFlag bool
 
 var packageCmd = &cobra.Command{
 	Use:   "package <script>",
@@ -66,7 +66,7 @@ Encoding (--encoding):
 
 		result, err := packager.Package(string(content), absScriptDir, packager.Options{
 			Encoding:   encodingFlag,
-			Trampoline: trampolineFlag,
+			Streamable: streamableFlag,
 		})
 		if err != nil {
 			return err

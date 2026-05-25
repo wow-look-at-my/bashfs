@@ -180,7 +180,7 @@ bashfs_cat greeting.txt
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 }
 
-func TestPackageTrampolinePiped(t *testing.T) {
+func TestPackageStreamablePiped(t *testing.T) {
 	dir := t.TempDir()
 	fsDir := filepath.Join(dir, "myfiles")
 	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
@@ -189,7 +189,7 @@ func TestPackageTrampolinePiped(t *testing.T) {
 eval $(bashfs gen ./myfiles)
 bashfs_cat greeting.txt
 `
-	result, err := Package(script, dir, Options{Trampoline: true})
+	result, err := Package(script, dir, Options{Streamable: true})
 	require.Nil(t, err)
 
 	output := string(result.Data)
@@ -198,13 +198,13 @@ bashfs_cat greeting.txt
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
 
-	// Direct execution: BASH_SOURCE[0] is a real path, trampoline skipped.
+	// Direct execution: BASH_SOURCE[0] is a real path, stream shim skipped.
 	out, err := exec.Command("bash", scriptPath).Output()
 	require.Nil(t, err)
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 
 	// Piped execution (simulates curl ... | bash): BASH_SOURCE[0]="main",
-	// trampoline must spool stdin to a tempfile and re-exec.
+	// stream shim must spool stdin to a tempfile and re-exec.
 	cmd := exec.Command("bash")
 	cmd.Stdin = bytes.NewReader(result.Data)
 	out, err = cmd.Output()
@@ -255,7 +255,7 @@ bashfs_cat sub/data.json
 	assert.Equal(t, `hello world{"port":8080}`, strings.TrimSpace(string(out)))
 }
 
-func TestPackageBase64TrampolinePiped(t *testing.T) {
+func TestPackageBase64StreamablePiped(t *testing.T) {
 	dir := t.TempDir()
 	fsDir := filepath.Join(dir, "myfiles")
 	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
@@ -264,7 +264,7 @@ func TestPackageBase64TrampolinePiped(t *testing.T) {
 eval $(bashfs gen ./myfiles)
 bashfs_cat greeting.txt
 `
-	result, err := Package(script, dir, Options{Encoding: EncodingBase64, Trampoline: true})
+	result, err := Package(script, dir, Options{Encoding: EncodingBase64, Streamable: true})
 	require.Nil(t, err)
 
 	assert.Contains(t, string(result.Data), "auto-bootstrap")

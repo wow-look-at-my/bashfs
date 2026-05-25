@@ -54,12 +54,12 @@ Raw mode refuses to write to a terminal (it's binary, would trash your cursor). 
 
 Both encodings produce a single self-contained script that runs identically - the `bashfs_*` helpers transparently decode whichever payload is at the end.
 
-#### `--trampoline`
+#### `--streamable`
 
-Add `--trampoline` to inject a bootstrap shim (11 lines) that makes the packaged script work when piped via stdin (`curl ... | bash`). Off by default.
+Add `--streamable` to inject a bootstrap shim (11 lines) that makes the packaged script work when piped via stdin (`curl ... | bash`). Off by default.
 
 ```bash
-bashfs package myscript.sh --trampoline > dist/myscript.sh
+bashfs package myscript.sh --streamable > dist/myscript.sh
 ```
 
 ## Generated Functions
