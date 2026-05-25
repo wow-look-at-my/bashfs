@@ -16,6 +16,8 @@ func init() {
 		fmt.Sprintf("payload encoding (one of: %s) - base64 trades ~33%% size for copy-paste safety", packager.Encodings))
 	if err := packageCmd.RegisterFlagCompletionFunc("encoding",
 		cobra.FixedCompletions(packager.Encodings, cobra.ShellCompDirectiveNoFileComp)); err != nil {
+		// Registration only fails if the flag doesn't exist - we just
+		// declared it, so this is a programmer error.
 		panic(err)
 	}
 	packageCmd.Flags().BoolVar(&trampolineFlag, "trampoline", false,
@@ -23,7 +25,7 @@ func init() {
 	rootCmd.AddCommand(packageCmd)
 }
 
-var encodingFlag = packager.EncodingRaw
+var encodingFlag = packager.EncodingRaw // default; overridden by --encoding
 var trampolineFlag bool
 
 var packageCmd = &cobra.Command{
