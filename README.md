@@ -54,6 +54,20 @@ Raw mode refuses to write to a terminal (it's binary, would trash your cursor). 
 
 Both encodings produce a single self-contained script that runs identically - the `bashfs_*` helpers transparently decode whichever payload is at the end. `curl ... | bash` piping works in both modes.
 
+#### Pre-packaging validation
+
+Before compressing, `bashfs package` validates all shell scripts (`.sh`, `.bash`, or files with a `#!/bin/bash` shebang) in the embedded filesystem:
+
+- **`bash -n` syntax check** on every shell file and the main script -- catches syntax errors before they're baked into the payload
+- **shellcheck** (if installed) -- advisory warnings printed to stderr, does not block packaging
+- **Source resolution** -- detects `source`/`.` commands within embedded shell files that reference missing files, and flags `source` commands in the main script that point into the bashfs directory (use `source <(bashfs_cat path)` instead)
+
+To skip validation:
+
+```bash
+bashfs package myscript.sh --no-validate > dist/myscript.sh
+```
+
 ## Generated Functions
 
 | Function | Description |

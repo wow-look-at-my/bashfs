@@ -2,12 +2,14 @@ package packager
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"bashfs/internal/bashgen"
 	"bashfs/internal/fswalker"
+	"bashfs/internal/validate"
 )
 
 // evalPattern matches the eval line that bashfs package replaces with the
@@ -77,11 +79,10 @@ func (e *Encoding) Set(s string) error {
 // Implements pflag.Value.
 func (e *Encoding) Type() string { return "encoding" }
 
-// Options controls Package behavior. Adding fields here is the extension
-// point for future flags (e.g. compression off) without breaking the
-// signature again.
+// Options controls Package behavior.
 type Options struct {
-	Encoding Encoding
+	Encoding       Encoding
+	SkipValidation bool
 }
 
 // Result holds the packaged script text and binary payload.
@@ -132,6 +133,23 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 	files, err := fswalker.Walk(dirArg)
 	if err != nil {
 		return nil, fmt.Errorf("walking directory %s: %w", dirArg, err)
+	}
+
+	if !opts.SkipValidation {
+		errs, warnings := validate.Run(files, scriptContent, scriptDir, dirArg)
+		for _, w := range warnings {
+			fmt.Fprintf(os.Stderr, "bashfs: warning: %s\n", w)
+		}
+		if len(errs) > 0 {
+			var b strings.Builder
+			b.WriteString("validation failed:\n")
+			for _, e := range errs {
+				b.WriteString("  ")
+				b.WriteString(e)
+				b.WriteString("\n")
+			}
+			return nil, fmt.Errorf("%s", b.String())
+		}
 	}
 
 	embedded, err := generate(files, opts.Encoding)

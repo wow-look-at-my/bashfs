@@ -354,6 +354,64 @@ func TestEncodingType(t *testing.T) {
 	assert.Equal(t, "encoding", e.Type())
 }
 
+func TestPackageValidationBlocksBadShellFile(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "broken.sh"), "#!/bin/bash\nif true\necho broken\n")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+echo hello
+`
+	_, err := Package(script, dir, Options{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validation failed")
+}
+
+func TestPackageValidationSkippedWithFlag(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "broken.sh"), "#!/bin/bash\nif true\necho broken\n")
+	mustWriteFile(t, filepath.Join(fsDir, "data.txt"), "hello")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat data.txt
+`
+	result, err := Package(script, dir, Options{SkipValidation: true})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestPackageValidationCatchesSourceIntoFs(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "assets")
+	mustWriteFile(t, filepath.Join(fsDir, "lib.sh"), "#!/bin/bash\necho lib\n")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./assets)
+source ./assets/lib.sh
+`
+	_, err := Package(script, dir, Options{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bashfs_cat")
+}
+
+func TestPackageValidationPassesCleanProject(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "helper.sh"), "#!/bin/bash\necho helper\n")
+	mustWriteFile(t, filepath.Join(fsDir, "config.json"), `{"port": 8080}`)
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat config.json
+`
+	result, err := Package(script, dir, Options{})
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
 func mustWriteFile(t *testing.T, path, content string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
