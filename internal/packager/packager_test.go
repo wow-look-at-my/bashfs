@@ -157,7 +157,7 @@ func TestPackagePreservesIndentation(t *testing.T) {
 	}
 }
 
-func TestPackageRunsDirect(t *testing.T) {
+func TestPackageRunsDirectAndPiped(t *testing.T) {
 	dir := t.TempDir()
 	fsDir := filepath.Join(dir, "myfiles")
 	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
@@ -168,32 +168,6 @@ bashfs_cat greeting.txt
 `
 	result, err := Package(script, dir, Options{})
 	require.Nil(t, err)
-
-	output := string(result.Data)
-	assert.NotContains(t, output, "__bfs_self")
-
-	scriptPath := filepath.Join(dir, "packaged.sh")
-	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
-
-	out, err := exec.Command("bash", scriptPath).Output()
-	require.Nil(t, err)
-	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
-}
-
-func TestPackageStreamablePiped(t *testing.T) {
-	dir := t.TempDir()
-	fsDir := filepath.Join(dir, "myfiles")
-	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
-
-	script := `#!/bin/bash
-eval $(bashfs gen ./myfiles)
-bashfs_cat greeting.txt
-`
-	result, err := Package(script, dir, Options{Streamable: true})
-	require.Nil(t, err)
-
-	output := string(result.Data)
-	assert.Contains(t, output, "__bfs_self")
 
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
@@ -232,7 +206,6 @@ bashfs_cat sub/data.json
 	assert.Contains(t, output, "base64 mode")
 	// Pipeline must include the base64 -d step before gzip -d.
 	assert.Contains(t, output, "| base64 -d | gzip -d")
-	assert.NotContains(t, output, "__bfs_self")
 
 	// The bytes after `exit 0\n` are the trailing payload - in base64 mode
 	// they MUST be printable ASCII for copy-paste through text channels to
@@ -253,31 +226,13 @@ bashfs_cat sub/data.json
 	out, err := exec.Command("bash", scriptPath).Output()
 	require.Nil(t, err)
 	assert.Equal(t, `hello world{"port":8080}`, strings.TrimSpace(string(out)))
-}
-
-func TestPackageBase64StreamablePiped(t *testing.T) {
-	dir := t.TempDir()
-	fsDir := filepath.Join(dir, "myfiles")
-	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
-
-	script := `#!/bin/bash
-eval $(bashfs gen ./myfiles)
-bashfs_cat greeting.txt
-`
-	result, err := Package(script, dir, Options{Encoding: EncodingBase64, Streamable: true})
-	require.Nil(t, err)
-
-	assert.Contains(t, string(result.Data), "__bfs_self")
-
-	scriptPath := filepath.Join(dir, "packaged.sh")
-	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
 
 	// Piped execution.
 	cmd := exec.Command("bash")
 	cmd.Stdin = bytes.NewReader(result.Data)
-	out, err := cmd.Output()
+	out, err = cmd.Output()
 	require.Nil(t, err)
-	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
+	assert.Equal(t, `hello world{"port":8080}`, strings.TrimSpace(string(out)))
 }
 
 func TestPackageBase64SurvivesTextRoundTrip(t *testing.T) {

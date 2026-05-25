@@ -52,15 +52,7 @@ bashfs package myscript.sh --encoding base64 > dist/myscript.sh
 
 Raw mode refuses to write to a terminal (it's binary, would trash your cursor). Always redirect, or pick `--encoding base64` if you want to inspect the output directly.
 
-Both encodings produce a single self-contained script that runs identically - the `bashfs_*` helpers transparently decode whichever payload is at the end.
-
-#### `--streamable`
-
-Add `--streamable` to inject a bootstrap shim (11 lines) that makes the packaged script work when piped via stdin (`curl ... | bash`). Off by default.
-
-```bash
-bashfs package myscript.sh --streamable > dist/myscript.sh
-```
+Both encodings produce a single self-contained script that runs identically - the `bashfs_*` helpers transparently decode whichever payload is at the end. `curl ... | bash` piping works in both modes.
 
 ## Generated Functions
 

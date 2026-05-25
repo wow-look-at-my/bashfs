@@ -81,8 +81,7 @@ func (e *Encoding) Type() string { return "encoding" }
 // point for future flags (e.g. compression off) without breaking the
 // signature again.
 type Options struct {
-	Encoding   Encoding
-	Streamable bool
+	Encoding Encoding
 }
 
 // Result holds the packaged script text and binary payload.
@@ -173,9 +172,7 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 	// this safe regardless of how the shim reshapes the prefix, and `cat`
 	// in the shim doesn't care whether the payload is binary (raw mode) or
 	// printable text (base64 mode).
-	if opts.Streamable {
-		scriptText = injectStreamable(scriptText)
-	}
+	scriptText = injectStreamable(scriptText)
 
 	// Combine script text + payload (raw bytes or base64 ASCII)
 	out := make([]byte, 0, len(scriptText)+len(embedded.Payload))

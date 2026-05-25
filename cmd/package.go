@@ -20,13 +20,10 @@ func init() {
 		// declared it, so this is a programmer error.
 		panic(err)
 	}
-	packageCmd.Flags().BoolVar(&streamableFlag, "streamable", false,
-		"inject a bootstrap shim so the script works when piped via stdin (curl|bash)")
 	rootCmd.AddCommand(packageCmd)
 }
 
 var encodingFlag = packager.EncodingRaw // default; overridden by --encoding
-var streamableFlag bool
 
 var packageCmd = &cobra.Command{
 	Use:   "package <script>",
@@ -64,10 +61,7 @@ Encoding (--encoding):
 			return fmt.Errorf("resolving script directory: %w", err)
 		}
 
-		result, err := packager.Package(string(content), absScriptDir, packager.Options{
-			Encoding:   encodingFlag,
-			Streamable: streamableFlag,
-		})
+		result, err := packager.Package(string(content), absScriptDir, packager.Options{Encoding: encodingFlag})
 		if err != nil {
 			return err
 		}
