@@ -81,7 +81,8 @@ func (e *Encoding) Type() string { return "encoding" }
 // point for future flags (e.g. compression off) without breaking the
 // signature again.
 type Options struct {
-	Encoding Encoding
+	Encoding   Encoding
+	Trampoline bool
 }
 
 // Result holds the packaged script text and binary payload.
@@ -163,16 +164,9 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 	}
 	scriptText += "exit 0\n"
 
-	// Inject auto-bootstrap trampoline so `curl ... | bash` Just Works.
-	// When piped via stdin, ${BASH_SOURCE[0]} is empty/main, so the helpers
-	// can't tail -c the payload off disk. Bash reads piped scripts
-	// line-by-line, so at trampoline time the rest of the script + payload
-	// is still on stdin - we spool it to a tempfile and re-exec.
-	// The runtime offset calc in embedded.go (filesize - payload_size) makes
-	// this safe regardless of how the trampoline reshapes the prefix, and
-	// `cat` in the trampoline doesn't care whether the payload is binary
-	// (raw mode) or printable text (base64 mode).
-	scriptText = injectTrampoline(scriptText)
+	if opts.Trampoline {
+		scriptText = injectTrampoline(scriptText)
+	}
 
 	// Combine script text + payload (raw bytes or base64 ASCII)
 	out := make([]byte, 0, len(scriptText)+len(embedded.Payload))

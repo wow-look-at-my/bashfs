@@ -16,14 +16,15 @@ func init() {
 		fmt.Sprintf("payload encoding (one of: %s) - base64 trades ~33%% size for copy-paste safety", packager.Encodings))
 	if err := packageCmd.RegisterFlagCompletionFunc("encoding",
 		cobra.FixedCompletions(packager.Encodings, cobra.ShellCompDirectiveNoFileComp)); err != nil {
-		// Registration only fails if the flag doesn't exist - we just
-		// declared it, so this is a programmer error.
 		panic(err)
 	}
+	packageCmd.Flags().BoolVar(&trampolineFlag, "trampoline", false,
+		"inject a curl|bash bootstrap shim so the script works when piped via stdin")
 	rootCmd.AddCommand(packageCmd)
 }
 
-var encodingFlag = packager.EncodingRaw // default; overridden by --encoding
+var encodingFlag = packager.EncodingRaw
+var trampolineFlag bool
 
 var packageCmd = &cobra.Command{
 	Use:   "package <script>",
@@ -61,7 +62,10 @@ Encoding (--encoding):
 			return fmt.Errorf("resolving script directory: %w", err)
 		}
 
-		result, err := packager.Package(string(content), absScriptDir, packager.Options{Encoding: encodingFlag})
+		result, err := packager.Package(string(content), absScriptDir, packager.Options{
+			Encoding:   encodingFlag,
+			Trampoline: trampolineFlag,
+		})
 		if err != nil {
 			return err
 		}
