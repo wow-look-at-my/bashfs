@@ -172,13 +172,13 @@ bashfs_cat greeting.txt
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
 
-	// Direct execution: BASH_SOURCE[0] is a real path, trampoline skipped.
+	// Direct execution: BASH_SOURCE[0] is a real path, stream shim skipped.
 	out, err := exec.Command("bash", scriptPath).Output()
 	require.Nil(t, err)
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 
 	// Piped execution (simulates curl ... | bash): BASH_SOURCE[0]="main",
-	// trampoline must spool stdin to a tempfile and re-exec.
+	// stream shim must spool stdin to a tempfile and re-exec.
 	cmd := exec.Command("bash")
 	cmd.Stdin = bytes.NewReader(result.Data)
 	out, err = cmd.Output()
@@ -186,7 +186,7 @@ bashfs_cat greeting.txt
 	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
 }
 
-func TestPackageBase64RunsDirectAndPiped(t *testing.T) {
+func TestPackageBase64Runs(t *testing.T) {
 	dir := t.TempDir()
 	fsDir := filepath.Join(dir, "myfiles")
 	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
