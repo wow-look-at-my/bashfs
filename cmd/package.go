@@ -11,15 +11,16 @@ import (
 	"golang.org/x/term"
 )
 
+var noValidateFlag bool
+
 func init() {
 	packageCmd.Flags().Var(&encodingFlag, "encoding",
 		fmt.Sprintf("payload encoding (one of: %s) - base64 trades ~33%% size for copy-paste safety", packager.Encodings))
 	if err := packageCmd.RegisterFlagCompletionFunc("encoding",
 		cobra.FixedCompletions(packager.Encodings, cobra.ShellCompDirectiveNoFileComp)); err != nil {
-		// Registration only fails if the flag doesn't exist - we just
-		// declared it, so this is a programmer error.
 		panic(err)
 	}
+	packageCmd.Flags().BoolVar(&noValidateFlag, "no-validate", false, "skip pre-packaging validation (bash -n, shellcheck, source resolution)")
 	rootCmd.AddCommand(packageCmd)
 }
 
@@ -61,7 +62,10 @@ Encoding (--encoding):
 			return fmt.Errorf("resolving script directory: %w", err)
 		}
 
-		result, err := packager.Package(string(content), absScriptDir, packager.Options{Encoding: encodingFlag})
+		result, err := packager.Package(string(content), absScriptDir, packager.Options{
+			Encoding:       encodingFlag,
+			SkipValidation: noValidateFlag,
+		})
 		if err != nil {
 			return err
 		}
