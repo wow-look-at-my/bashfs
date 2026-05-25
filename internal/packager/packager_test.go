@@ -170,7 +170,7 @@ bashfs_cat greeting.txt
 	require.Nil(t, err)
 
 	output := string(result.Data)
-	assert.NotContains(t, output, "auto-bootstrap")
+	assert.NotContains(t, output, "__bfs_self")
 
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
@@ -193,7 +193,7 @@ bashfs_cat greeting.txt
 	require.Nil(t, err)
 
 	output := string(result.Data)
-	assert.Contains(t, output, "auto-bootstrap")
+	assert.Contains(t, output, "__bfs_self")
 
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
@@ -232,7 +232,7 @@ bashfs_cat sub/data.json
 	assert.Contains(t, output, "base64 mode")
 	// Pipeline must include the base64 -d step before gzip -d.
 	assert.Contains(t, output, "| base64 -d | gzip -d")
-	assert.NotContains(t, output, "auto-bootstrap")
+	assert.NotContains(t, output, "__bfs_self")
 
 	// The bytes after `exit 0\n` are the trailing payload - in base64 mode
 	// they MUST be printable ASCII for copy-paste through text channels to
@@ -267,7 +267,7 @@ bashfs_cat greeting.txt
 	result, err := Package(script, dir, Options{Encoding: EncodingBase64, Streamable: true})
 	require.Nil(t, err)
 
-	assert.Contains(t, string(result.Data), "auto-bootstrap")
+	assert.Contains(t, string(result.Data), "__bfs_self")
 
 	scriptPath := filepath.Join(dir, "packaged.sh")
 	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))

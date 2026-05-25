@@ -196,13 +196,7 @@ func generate(files []fswalker.FileEntry, enc Encoding) (*bashgen.EmbeddedResult
 	}
 }
 
-const streamShim = `# bashfs auto-bootstrap: re-exec from a real file when piped via stdin.
-# When piped (curl ... | bash), BASH_SOURCE[0] is empty at top level, so
-# the helpers (which run inside functions where it becomes "main") can't
-# tail -c the payload off disk. Spool the rest of stdin to a tempfile
-# and re-exec - bash reads piped scripts line-by-line, so at this point
-# the rest of the script + payload is still queued on stdin.
-if [ -z "${BASH_SOURCE[0]:-}" ] || ! [ -r "${BASH_SOURCE[0]}" ]; then
+const streamShim = `if [ -z "${BASH_SOURCE[0]:-}" ] || ! [ -r "${BASH_SOURCE[0]}" ]; then
   __bfs_self=$(mktemp) || { echo "bashfs: mktemp failed" >&2; exit 1; }
   { printf '#!/bin/bash\n: bashfs re-exec stub\n'; cat; } > "$__bfs_self" && exec bash "$__bfs_self" "$@"
   exit 1
