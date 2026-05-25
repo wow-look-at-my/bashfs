@@ -163,6 +163,17 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 	}
 	scriptText += "exit 0\n"
 
+	// Inject auto-bootstrap trampoline so `curl ... | bash` Just Works.
+	// When piped via stdin, ${BASH_SOURCE[0]} is empty/main, so the helpers
+	// can't tail -c the payload off disk. Bash reads piped scripts
+	// line-by-line, so at trampoline time the rest of the script + payload
+	// is still on stdin - we spool it to a tempfile and re-exec.
+	// The runtime offset calc in embedded.go (filesize - payload_size) makes
+	// this safe regardless of how the trampoline reshapes the prefix, and
+	// `cat` in the trampoline doesn't care whether the payload is binary
+	// (raw mode) or printable text (base64 mode).
+	scriptText = injectTrampoline(scriptText)
+
 	// Combine script text + payload (raw bytes or base64 ASCII)
 	out := make([]byte, 0, len(scriptText)+len(embedded.Payload))
 	out = append(out, []byte(scriptText)...)
@@ -182,3 +193,27 @@ func generate(files []fswalker.FileEntry, enc Encoding) (*bashgen.EmbeddedResult
 	}
 }
 
+const trampoline = `# bashfs auto-bootstrap: re-exec from a real file when piped via stdin.
+# When piped (curl ... | bash), BASH_SOURCE[0] is empty at top level, so
+# the helpers (which run inside functions where it becomes "main") can't
+# tail -c the payload off disk. Spool the rest of stdin to a tempfile
+# and re-exec - bash reads piped scripts line-by-line, so at this point
+# the rest of the script + payload is still queued on stdin.
+if [ -z "${BASH_SOURCE[0]:-}" ] || ! [ -r "${BASH_SOURCE[0]}" ]; then
+  __bfs_self=$(mktemp) || { echo "bashfs: mktemp failed" >&2; exit 1; }
+  { printf '#!/bin/bash\n: bashfs re-exec stub\n'; cat; } > "$__bfs_self" && exec bash "$__bfs_self" "$@"
+  exit 1
+fi
+`
+
+// injectTrampoline inserts the auto-bootstrap block after the shebang line
+// (or at the top if there isn't one).
+func injectTrampoline(scriptText string) string {
+	if strings.HasPrefix(scriptText, "#!") {
+		if nl := strings.Index(scriptText, "\n"); nl >= 0 {
+			return scriptText[:nl+1] + trampoline + scriptText[nl+1:]
+		}
+		return scriptText + "\n" + trampoline
+	}
+	return trampoline + scriptText
+}
