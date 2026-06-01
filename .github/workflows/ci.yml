@@ -16,3 +16,4 @@ jobs:
       - uses: wow-look-at-my/go-toolchain@v1
         with:
           autorelease: 'true'
+          permissions: ${{ toJSON(permissions) }}
