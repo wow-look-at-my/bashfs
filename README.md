@@ -68,6 +68,50 @@ To skip validation:
 bashfs package myscript.sh --no-validate > dist/myscript.sh
 ```
 
+#### Profiling mode
+
+`bashfs package` can bake in an opt-in profiling mode that benchmarks the parts
+of the packaged script that bashfs owns -- the startup integrity check (a
+SHA-256 over the whole payload, paid on every run before any user code) and the
+extraction of each embedded file -- using [hyperfine](https://github.com/sharkdp/hyperfine).
+
+It is inert on a normal run. To profile, set `BASHFS_PROFILE_SCRIPT=1`:
+
+```bash
+BASHFS_PROFILE_SCRIPT=1 ./dist/myscript.sh
+```
+
+The script then benchmarks each operation with hyperfine, prints a comparison
+table, and exits **before** running its own body -- so profiling never kicks off
+your script's real work. It assumes `hyperfine` is installed on the machine
+running the script.
+
+Choose how profiling support is embedded with `--profiling-support`:
+
+| Mode | Size impact | Runtime requirement | Use when |
+|---|---|---|---|
+| `web` (default) | tiny stub (~0.7 KB) | downloads the harness over HTTPS the first time you profile | smallest script; profiling machine has network access |
+| `local` | embeds the full harness (~4 KB) | none | air-gapped / offline machines |
+| `none` | nothing | n/a | you never want profiling support baked in |
+
+```bash
+# Embed the harness so profiling works with no network access:
+bashfs package myscript.sh --profiling-support local > dist/myscript.sh
+```
+
+In `web` mode only a small stub is embedded; when profiling is triggered it
+`curl`s the harness from the public repo and runs it, keeping the packaged
+script tiny.
+
+Optional runtime knobs:
+
+| Variable | Effect |
+|---|---|
+| `BASHFS_PROFILE_SCRIPT=1` | enable profiling mode |
+| `BASHFS_PROFILE_WARMUP=N` | hyperfine warmup runs (default 3) |
+| `BASHFS_PROFILE_RUNS=N` | fix the number of timed runs |
+| `BASHFS_PROFILE_JSON=path` | also export raw results as JSON to `path` |
+
 ## Generated Functions
 
 | Function | Description |

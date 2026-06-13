@@ -9,6 +9,7 @@ import (
 
 	"bashfs/internal/bashgen"
 	"bashfs/internal/fswalker"
+	"bashfs/internal/profiling"
 	"bashfs/internal/validate"
 )
 
@@ -83,6 +84,11 @@ func (e *Encoding) Type() string { return "encoding" }
 type Options struct {
 	Encoding       Encoding
 	SkipValidation bool
+
+	// Profiling selects whether (and how) an opt-in hyperfine profiling mode is
+	// baked into the packaged script. The zero value, SupportWeb, embeds only a
+	// small download stub; see internal/profiling.
+	Profiling profiling.Support
 }
 
 // Result holds the packaged script text and binary payload.
@@ -152,7 +158,7 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 		}
 	}
 
-	embedded, err := generate(files, opts.Encoding)
+	embedded, err := generate(files, opts.Encoding, profiling.Block(opts.Profiling))
 	if err != nil {
 		return nil, fmt.Errorf("generating embedded code: %w", err)
 	}
@@ -200,12 +206,12 @@ func Package(scriptContent string, scriptDir string, opts Options) (*Result, err
 	return &Result{Data: out}, nil
 }
 
-func generate(files []fswalker.FileEntry, enc Encoding) (*bashgen.EmbeddedResult, error) {
+func generate(files []fswalker.FileEntry, enc Encoding, profileBlock string) (*bashgen.EmbeddedResult, error) {
 	switch enc {
 	case EncodingRaw:
-		return bashgen.GenerateEmbedded(files)
+		return bashgen.GenerateEmbedded(files, profileBlock)
 	case EncodingBase64:
-		return bashgen.GenerateEmbeddedBase64(files)
+		return bashgen.GenerateEmbeddedBase64(files, profileBlock)
 	default:
 		return nil, fmt.Errorf("unknown encoding %d", enc)
 	}

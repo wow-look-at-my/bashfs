@@ -61,6 +61,7 @@ type scriptData struct {
 	PayloadSHA256 string
 	Files         []fileInfo
 	Decode        string
+	ProfileBlock  string
 }
 
 var scriptTmpl = template.Must(template.New("script").Parse(scriptTemplate))
@@ -109,14 +110,22 @@ bashfs_extract() {
 bashfs_list() {
   local _k; for _k in "${!__bashfs_offset[@]}"; do printf '%s\n' "$_k"; done | sort
 }
+{{if .ProfileBlock}}
+# --- bashfs profiling support (set BASHFS_PROFILE_SCRIPT=1 to benchmark) ---
+__bashfs_self="${BASH_SOURCE[0]}"
+__bashfs_decode="{{.Decode}}"
+{{.ProfileBlock}}{{end -}}
 `
 
 // GenerateEmbedded produces bash code that reads compressed file data from the
 // end of the script itself (after an exit 0 guard). File contents are stored as
 // a raw binary payload appended to the script; the bash code uses tail/head to
 // extract individual files by byte offset and length.
-func GenerateEmbedded(files []fswalker.FileEntry) (*EmbeddedResult, error) {
-	return generate(files, rawSpec)
+//
+// profileBlock, when non-empty, is bash injected after the helper functions to
+// add an opt-in profiling mode (see internal/profiling). Pass "" for none.
+func GenerateEmbedded(files []fswalker.FileEntry, profileBlock string) (*EmbeddedResult, error) {
+	return generate(files, rawSpec, profileBlock)
 }
 
 // GenerateEmbeddedBase64 is the copy-paste-safe variant: each file is gzipped
@@ -128,11 +137,11 @@ func GenerateEmbedded(files []fswalker.FileEntry) (*EmbeddedResult, error) {
 // Per-file (rather than whole-payload) base64 encoding is what makes slicing
 // safe: each chunk has its own padding and starts at a 4-byte boundary in the
 // concatenated stream, so any sliced range is valid base64 standing alone.
-func GenerateEmbeddedBase64(files []fswalker.FileEntry) (*EmbeddedResult, error) {
-	return generate(files, base64Spec)
+func GenerateEmbeddedBase64(files []fswalker.FileEntry, profileBlock string) (*EmbeddedResult, error) {
+	return generate(files, base64Spec, profileBlock)
 }
 
-func generate(files []fswalker.FileEntry, spec encodingSpec) (*EmbeddedResult, error) {
+func generate(files []fswalker.FileEntry, spec encodingSpec, profileBlock string) (*EmbeddedResult, error) {
 	payload, infos, err := collectChunks(files, spec.chunk)
 	if err != nil {
 		return nil, err
@@ -147,6 +156,7 @@ func generate(files []fswalker.FileEntry, spec encodingSpec) (*EmbeddedResult, e
 		PayloadSHA256: checksum,
 		Files:         infos,
 		Decode:        spec.decode,
+		ProfileBlock:  profileBlock,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("executing template: %w", err)
