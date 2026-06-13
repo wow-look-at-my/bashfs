@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wow-look-at-my/testify/assert"
-	"github.com/wow-look-at-my/testify/require"
+	"bashfs/internal/profiling"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPackage(t *testing.T) {
@@ -410,6 +411,140 @@ bashfs_cat config.json
 	result, err := Package(script, dir, Options{})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+}
+
+// TestPackageProfilingNone confirms the opt-out: with no profiling support the
+// packaged script carries none of the profiling scaffolding and is what it
+// would have been before the feature existed.
+func TestPackageProfilingNone(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir, Options{Profiling: profiling.SupportNone})
+	require.NoError(t, err)
+	output := string(result.Data)
+
+	assert.NotContains(t, output, "BASHFS_PROFILE_SCRIPT")
+	assert.NotContains(t, output, "__bashfs_self=")
+	assert.NotContains(t, output, "__bashfs_decode=")
+}
+
+// TestPackageProfilingWebEmbedsStub checks web mode (the default) embeds only
+// the small download stub - the URL and an env guard - not the harness body.
+func TestPackageProfilingWebEmbedsStub(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	// Default Options{} must select web mode (zero value).
+	result, err := Package(script, dir, Options{})
+	require.NoError(t, err)
+	output := string(result.Data)
+
+	assert.Contains(t, output, "BASHFS_PROFILE_SCRIPT")
+	assert.Contains(t, output, profiling.HarnessURL)
+	assert.Contains(t, output, "__bashfs_self=")
+	// The harness body itself must NOT be inlined in web mode.
+	assert.NotContains(t, output, "__bashfs_profile_main")
+}
+
+// TestPackageProfilingWebRunsNormallyWithoutEnv is the load-bearing guarantee
+// that web mode costs nothing on a normal run: the script executes its body
+// without the env var set, never touching the network.
+func TestPackageProfilingWebRunsNormallyWithoutEnv(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir, Options{})
+	require.NoError(t, err)
+
+	scriptPath := filepath.Join(dir, "packaged.sh")
+	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
+
+	cmd := exec.Command("bash", scriptPath)
+	// Make any accidental network use fail fast instead of hanging the test.
+	cmd.Env = append(os.Environ(), "http_proxy=http://127.0.0.1:0", "https_proxy=http://127.0.0.1:0")
+	out, err := cmd.Output()
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", strings.TrimSpace(string(out)))
+}
+
+// TestPackageProfilingLocalEmbedsHarness checks local mode inlines the full
+// harness (so it works offline) with no download URL.
+func TestPackageProfilingLocalEmbedsHarness(t *testing.T) {
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir, Options{Profiling: profiling.SupportLocal})
+	require.NoError(t, err)
+	output := string(result.Data)
+
+	assert.Contains(t, output, "__bashfs_profile_main")
+	assert.Contains(t, output, "hyperfine")
+	assert.NotContains(t, output, profiling.HarnessURL)
+}
+
+// TestPackageProfilingLocalRunsUnderHyperfine is the end-to-end proof: a
+// locally-profiled script, run with BASHFS_PROFILE_SCRIPT=1, benchmarks the
+// integrity check and each embedded file with hyperfine and exits before the
+// user's body. Skipped where hyperfine isn't installed (e.g. CI), since the
+// feature explicitly assumes it's present.
+func TestPackageProfilingLocalRunsUnderHyperfine(t *testing.T) {
+	if _, err := exec.LookPath("hyperfine"); err != nil {
+		t.Skip("hyperfine not installed; skipping profiling end-to-end test")
+	}
+
+	dir := t.TempDir()
+	fsDir := filepath.Join(dir, "myfiles")
+	mustWriteFile(t, filepath.Join(fsDir, "greeting.txt"), "hello world")
+	mustWriteFile(t, filepath.Join(fsDir, "sub", "data.json"), `{"port":8080}`)
+
+	script := `#!/bin/bash
+eval $(bashfs gen ./myfiles)
+echo "USER BODY RAN"
+bashfs_cat greeting.txt
+`
+	result, err := Package(script, dir, Options{Profiling: profiling.SupportLocal})
+	require.NoError(t, err)
+
+	scriptPath := filepath.Join(dir, "packaged.sh")
+	require.NoError(t, os.WriteFile(scriptPath, result.Data, 0755))
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"BASHFS_PROFILE_SCRIPT=1",
+		"BASHFS_PROFILE_WARMUP=1",
+		"BASHFS_PROFILE_RUNS=2",
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoErrorf(t, err, "profiling run failed: %s", out)
+	combined := string(out)
+
+	// hyperfine benchmarked the parts bashfs owns.
+	assert.Contains(t, combined, "integrity-check")
+	assert.Contains(t, combined, "cat:greeting.txt")
+	assert.Contains(t, combined, "cat:sub/data.json")
+	// Profiling mode must stop before the user's body.
+	assert.NotContains(t, combined, "USER BODY RAN")
 }
 
 func mustWriteFile(t *testing.T, path, content string) {

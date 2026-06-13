@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"bashfs/internal/packager"
+	"bashfs/internal/profiling"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -20,11 +22,20 @@ func init() {
 		cobra.FixedCompletions(packager.Encodings, cobra.ShellCompDirectiveNoFileComp)); err != nil {
 		panic(err)
 	}
+	packageCmd.Flags().Var(&profilingFlag, "profiling-support",
+		fmt.Sprintf("embed an opt-in hyperfine profiling mode, run by BASHFS_PROFILE_SCRIPT=1 (one of: %s) - web fetches the harness on demand, local embeds it, none omits it",
+			strings.Join(profiling.Supports, ", ")))
+	if err := packageCmd.RegisterFlagCompletionFunc("profiling-support",
+		cobra.FixedCompletions(profiling.Supports, cobra.ShellCompDirectiveNoFileComp)); err != nil {
+		panic(err)
+	}
 	packageCmd.Flags().BoolVar(&noValidateFlag, "no-validate", false, "skip pre-packaging validation (bash -n, shellcheck, source resolution)")
 	rootCmd.AddCommand(packageCmd)
 }
 
 var encodingFlag = packager.EncodingRaw // default; overridden by --encoding
+
+var profilingFlag = profiling.SupportWeb // default; overridden by --profiling-support
 
 var packageCmd = &cobra.Command{
 	Use:   "package <script>",
@@ -39,7 +50,15 @@ Encoding (--encoding):
           Refuses to run when stdout is a terminal (would splatter binary bytes).
   base64  per-file base64 ASCII - ~33% larger, but survives copy-paste through
           chat clients, web forms, code review comments, and other text-only
-          channels that mangle non-printable bytes.`,
+          channels that mangle non-printable bytes.
+
+Profiling (--profiling-support):
+  web     (default) embed a tiny stub that downloads a hyperfine profiling
+          harness on demand. Adds almost nothing to the script.
+  local   embed the whole harness, so profiling works with no network access.
+  none    omit profiling support entirely.
+  At runtime, set BASHFS_PROFILE_SCRIPT=1 to benchmark the script's bashfs
+  operations (startup integrity check + per-file extraction) with hyperfine.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		scriptPath := args[0]
@@ -65,6 +84,7 @@ Encoding (--encoding):
 		result, err := packager.Package(string(content), absScriptDir, packager.Options{
 			Encoding:       encodingFlag,
 			SkipValidation: noValidateFlag,
+			Profiling:      profilingFlag,
 		})
 		if err != nil {
 			return err
@@ -74,8 +94,7 @@ Encoding (--encoding):
 			return fmt.Errorf("writing to stdout: %w", err)
 		}
 
-		fmt.Fprintf(os.Stderr, "bashfs: packaged %s (encoding=%s, %d bytes)\n", scriptPath, encodingFlag, len(result.Data))
+		fmt.Fprintf(os.Stderr, "bashfs: packaged %s (encoding=%s, profiling=%s, %d bytes)\n", scriptPath, encodingFlag, profilingFlag, len(result.Data))
 		return nil
 	},
 }
-

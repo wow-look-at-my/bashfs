@@ -15,8 +15,8 @@ import (
 	"testing"
 
 	"bashfs/internal/fswalker"
-	"github.com/wow-look-at-my/testify/assert"
-	"github.com/wow-look-at-my/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateDevMode(t *testing.T) {
@@ -153,7 +153,7 @@ func TestGenerateEmbedded(t *testing.T) {
 	files, err := fswalker.Walk(dir)
 	require.Nil(t, err)
 
-	result, err := GenerateEmbedded(files)
+	result, err := GenerateEmbedded(files, "")
 	require.Nil(t, err)
 
 	// Verify offset array declaration
@@ -180,7 +180,7 @@ func TestGenerateEmbedded(t *testing.T) {
 }
 
 func TestGenerateEmbeddedEmpty(t *testing.T) {
-	result, err := GenerateEmbedded(nil)
+	result, err := GenerateEmbedded(nil, "")
 	require.Nil(t, err)
 
 	assert.Contains(t, result.Script, "declare -A __bashfs_offset")
@@ -197,7 +197,7 @@ func TestGenerateEmbeddedBase64(t *testing.T) {
 	files, err := fswalker.Walk(dir)
 	require.Nil(t, err)
 
-	result, err := GenerateEmbeddedBase64(files)
+	result, err := GenerateEmbeddedBase64(files, "")
 	require.Nil(t, err)
 
 	// Header advertises base64 mode.
@@ -249,7 +249,7 @@ func TestGenerateEmbeddedBase64(t *testing.T) {
 }
 
 func TestGenerateEmbeddedBase64Empty(t *testing.T) {
-	result, err := GenerateEmbeddedBase64(nil)
+	result, err := GenerateEmbeddedBase64(nil, "")
 	require.Nil(t, err)
 
 	assert.Contains(t, result.Script, "(base64 mode)")

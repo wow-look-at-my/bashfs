@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
-	"github.com/wow-look-at-my/testify/assert"
-	"github.com/wow-look-at-my/testify/require"
 )
 
 func TestEncode(t *testing.T) {

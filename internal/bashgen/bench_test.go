@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"bashfs/internal/fswalker"
-	"github.com/wow-look-at-my/testify/require"
+	"github.com/stretchr/testify/require"
 )
 
 // benchSizes is the matrix of "total bytes worth of fixture across N files"
@@ -54,7 +54,7 @@ func BenchmarkGenerateEmbedded(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := GenerateEmbedded(files)
+				_, err := GenerateEmbedded(files, "")
 				require.NoError(b, err)
 			}
 		})
@@ -68,7 +68,7 @@ func BenchmarkGenerateEmbeddedBase64(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := GenerateEmbeddedBase64(files)
+				_, err := GenerateEmbeddedBase64(files, "")
 				require.NoError(b, err)
 			}
 		})
